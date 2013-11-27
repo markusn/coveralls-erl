@@ -2,7 +2,7 @@ coveralls-erl
 =============
 [![Build Status](https://travis-ci.org/markusn/coveralls-erl.png?branch=master)](https://travis-ci.org/markusn/coveralls-erl)
 
-Erlang module to convert and send cover data to coveralls. Work in progress.
+WIP: Erlang module to convert and send cover data to coveralls.
 
 ## Author
 Markus Näsman (markus at botten dot org).
