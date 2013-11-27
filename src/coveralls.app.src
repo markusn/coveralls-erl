@@ -1,0 +1,8 @@
+{application, coveralls,
+ [ {description, "Coveralls for Erlang"}
+ , {vsn, git}
+ , {modules, []}
+ , {registred, []}
+ , {applications,[kernel, stdlib]}
+ ]
+}.
