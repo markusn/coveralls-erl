@@ -48,7 +48,7 @@
 
 -record(s, { importer      = fun cover:import/1
            , module_lister = fun cover:imported_modules/0
-           , mod_info      = passthrough
+           , mod_info      = fun module_info_compile/1
            , file_reader   = fun file:read_file/1
            , analyser      = fun cover:analyse/3
            }).
@@ -105,8 +105,11 @@ imported_modules(#s{module_lister=F}) ->
 analyze(#s{analyser=F}, Mod) ->
   F(Mod, calls, line).
 
-compile_info(#s{mod_info=passthrough}, Mod) -> Mod:module_info(compile);
-compile_info(#s{mod_info=MockMod}, Mod)     -> MockMod(Mod).
+compile_info(#s{mod_info=F}, Mod) ->
+  F(Mod).
+
+module_info_compile(Mod) ->
+  Mod:module_info(compile).
 
 read_file(#s{file_reader=F}, SrcFile) ->
   F(SrcFile).
