@@ -53,12 +53,14 @@
            , analyser      = fun cover:analyse/3
            , poster        = fun httpc:request/4
            , poster_init   = fun inets:start/0
+           , poster_stop   = fun inets:stop/0
            }).
 
 %%=============================================================================
 %% Defines
 
 -define(COVERALLS_URL, "https://coveralls.io/api/v1/jobs").
+%%-define(COVERALLS_URL, "http://127.0.0.1:8080").
 
 %%=============================================================================
 %% API functions
@@ -100,12 +102,14 @@ convert_file(Filename, ServiceJobId, ServiceName, S) ->
   lists:flatten(
     io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
 
-send(Json, #s{poster=Poster, poster_init=PosterInit}) ->
-  ok = PosterInit(),
-  Type = "application/json",
-  Body = lists:flatten(io_lib:format("json_file=~s", [Json])),
-  R    = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
+send(Json, #s{poster=Poster, poster_init=Init, poster_stop=Stop}) ->
+  ok       = Init(),
+  Boundary = "----------" ++ integer_to_list(random:uniform(1000)),
+  Type     = "multipart/form-data; boundary=" ++ Boundary,
+  Body     = to_body(Json, Boundary),
+  R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
   {ok, {{_, ReturnCode, _}, _, Message}} = R,
+  ok       = Stop(),
   case ReturnCode of
     200 -> ok;
     _   -> throw({error, Message})
@@ -113,6 +117,15 @@ send(Json, #s{poster=Poster, poster_init=PosterInit}) ->
 
 convert_and_send_file(Filename, ServiceJobId, ServiceName, S) ->
   send(convert_file(Filename, ServiceJobId, ServiceName, S), S).
+
+%%-----------------------------------------------------------------------------
+%% HTTP helpers
+
+to_body(Json, Boundary) ->
+  "--" ++ Boundary ++ "\r\n" ++
+    "Content-Disposition: form-data; name=\"json_file\"\r\n"
+    "Content-Type: application/octet-stream\r\n\r\n"
+    ++ Json ++ "\r\n" ++ "--" ++ Boundary ++ "--" ++ "\r\n".
 
 %%-----------------------------------------------------------------------------
 %% Callback mockery
@@ -146,7 +159,8 @@ convert_module(Mod, S) ->
   {ok, CoveredLines} = analyze(S, Mod),
   SrcFile            = proplists:get_value(source, compile_info(S, Mod)),
   Name               = filename:basename(SrcFile),
-  {ok, Src}          = read_file(S, SrcFile),
+  {ok, SrcBin}       = read_file(S, SrcFile),
+  Src                = lists:flatten(io_lib:format("~s", [SrcBin])),
   LinesCount         = count_lines(Src),
   Cov                = create_cov(CoveredLines, LinesCount),
   Str                =
@@ -155,7 +169,7 @@ convert_module(Mod, S) ->
     "\"source\": \"~s\",~n"
     "\"coverage\": ~p~n"
     "}",
-  lists:flatten(io_lib:format(Str, [Name, Src, Cov])).
+  lists:flatten(io_lib:format(Str, [Name, replace_newlines(Src, "\\n"), Cov])).
 
 create_cov(_CoveredLines, [])                                    ->
   [];
@@ -169,17 +183,15 @@ create_cov(CoveredLines, [_|LineNos])                            ->
 %%-----------------------------------------------------------------------------
 %% Generic helpers
 
-count_lines(<<>>) ->
-  0;
-count_lines(B)    ->
-  length(
-    lists:filter(
-      fun(X) -> X =/= <<>> end,
-      binary:split(B, <<"\n">>, [global]))).
+count_lines(S) -> length(string:tokens(S, "\n")).
 
 join([H], _Sep)  -> H;
 join([H|T], Sep) ->
   H++Sep++join(T, Sep).
+
+replace_newlines("", _)        -> "";
+replace_newlines("\n" ++ S, A) -> A ++ replace_newlines(S, A);
+replace_newlines([E|S], A)     -> [E|replace_newlines(S,A)].
 
 %%=============================================================================
 %% Tests
@@ -194,12 +206,12 @@ convert_file_test() ->
     "\"source_files\": [\n"
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
+    "\"source\": \"def four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "},\n"
     "{\n"
     "\"name\": \"two.rb\",\n"
-    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
+    "\"source\": \"def seven\\n  eight\\n  nine\\nend\",\n"
     "\"coverage\": [null,1,0,null]\n"
     "}\n"
     "]\n"
@@ -217,12 +229,12 @@ convert_and_send_file_test() ->
     "\"source_files\": [\n"
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
+    "\"source\": \"def four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "},\n"
     "{\n"
     "\"name\": \"two.rb\",\n"
-    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
+    "\"source\": \"def seven\\n  eight\\n  nine\\nend\",\n"
     "\"coverage\": [null,1,0,null]\n"
     "}\n"
     "]\n"
@@ -240,7 +252,7 @@ send_test_() ->
     "\"source_files\": [\n"
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
+    "\"source\": \"def four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "}\n]\n}",
   [ ?_assertEqual(ok, send(Expected, mock_s(Expected)))
@@ -251,17 +263,20 @@ send_test_() ->
 %% Generic helpers tests
 
 count_lines_test_() ->
-  [ ?_assertEqual(0, count_lines(<<>>))
-  , ?_assertEqual(1, count_lines(<<"foo">>))
-  , ?_assertEqual(1, count_lines(<<"bar\n">>))
-  , ?_assertEqual(2, count_lines(<<"foo\nbar">>))
-  , ?_assertEqual(2, count_lines(<<"foo\nbar\n">>))
+  [ ?_assertEqual(0, count_lines(""))
+  , ?_assertEqual(1, count_lines("foo"))
+  , ?_assertEqual(1, count_lines("bar\n"))
+  , ?_assertEqual(2, count_lines("foo\nbar"))
+  , ?_assertEqual(2, count_lines("foo\nbar\n"))
   ].
 
 join_test_() ->
   [ ?_assertEqual("a,b"   , join(["a","b"], ","))
   , ?_assertEqual("a,b,c" , join(["a","b","c"], ","))
   ].
+
+replace_newlines_test() ->
+ ?assertEqual("foo\\nbar\\n", replace_newlines("foo\nbar\n", "\\n")).
 
 %%-----------------------------------------------------------------------------
 %% Converting modules tests
@@ -274,7 +289,7 @@ convert_module_test() ->
   Expected =
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
+    "\"source\": \"def four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "}",
   ?assertEqual(Expected, lists:flatten(convert_module('example.rb', mock_s()))).
@@ -284,12 +299,12 @@ convert_modules_test() ->
     "[\n"
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
+    "\"source\": \"def four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "},\n"
     "{\n"
     "\"name\": \"two.rb\",\n"
-    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
+    "\"source\": \"def seven\\n  eight\\n  nine\\nend\",\n"
     "\"coverage\": [null,1,0,null]\n"
     "}\n"
     "]\n",
@@ -301,7 +316,7 @@ convert_modules_test() ->
 
 mock_s() -> mock_s("").
 
-mock_s(ExpectedJson) ->
+mock_s(Json) ->
   #s{ importer      =
         fun(_) -> ok end
     , module_lister =
@@ -327,13 +342,13 @@ mock_s(ExpectedJson) ->
         fun() -> ok end
     , poster        =
         fun(post, {_, _, _, Body}, _, _) ->
-            case Body of
-              "json_file=" ++ ExpectedJson ->
-                {ok, {{"", 200, ""}, "", ""}};
-              _                          ->
-                {ok, {{"", 666, ""}, "", "Not expected"}}
+            case string:str(Body, Json) =/= 0 of
+              true  -> {ok, {{"", 200, ""}, "", ""}};
+              false -> {ok, {{"", 666, ""}, "", "Not expected"}}
             end
         end
+    , poster_stop  =
+        fun() -> ok end
     }.
 
 %%% Local Variables:
