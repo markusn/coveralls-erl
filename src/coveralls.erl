@@ -51,7 +51,14 @@
            , mod_info      = fun module_info_compile/1
            , file_reader   = fun file:read_file/1
            , analyser      = fun cover:analyse/3
+           , poster        = fun httpc:request/4
+           , poster_init   = fun inets:start/0
            }).
+
+%%=============================================================================
+%% Defines
+
+-define(COVERALLS_URL, "https://coveralls.io/api/v1/jobs").
 
 %%=============================================================================
 %% API functions
@@ -71,12 +78,12 @@ convert_file(Filename, ServiceJobId, ServiceName) ->
 %% @end
 -spec convert_and_send_file(string(), string(), string()) -> ok.
 convert_and_send_file(Filename, ServiceJobId, ServiceName) ->
-  send(convert_file(Filename, ServiceJobId, ServiceName)).
+  convert_and_send_file(Filename, ServiceJobId, ServiceName, #s{}).
 
 %% @doc Send json string to coveralls
 -spec send(string()) -> ok.
-send(_Json) ->
-  throw(not_implemented).
+send(Json) ->
+  send(Json, #s{}).
 
 %%=============================================================================
 %% Internal functions
@@ -92,6 +99,20 @@ convert_file(Filename, ServiceJobId, ServiceName, S) ->
     "}",
   lists:flatten(
     io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
+
+send(Json, #s{poster=Poster, poster_init=PosterInit}) ->
+  ok = PosterInit(),
+  Type = "application/json",
+  Body = lists:flatten(io_lib:format("json_file=~s", [Json])),
+  R    = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
+  {ok, {{_, ReturnCode, _}, _, Message}} = R,
+  case ReturnCode of
+    200 -> ok;
+    _   -> throw({error, Message})
+  end.
+
+convert_and_send_file(Filename, ServiceJobId, ServiceName, S) ->
+  send(convert_file(Filename, ServiceJobId, ServiceName, S), S).
 
 %%-----------------------------------------------------------------------------
 %% Callback mockery
@@ -148,10 +169,6 @@ create_cov(CoveredLines, [_|LineNos])                            ->
 %%-----------------------------------------------------------------------------
 %% Generic helpers
 
-join([H], _Sep)  -> H;
-join([H|T], Sep) ->
-  H++Sep++join(T, Sep).
-
 count_lines(<<>>) ->
   0;
 count_lines(B)    ->
@@ -160,10 +177,78 @@ count_lines(B)    ->
       fun(X) -> X =/= <<>> end,
       binary:split(B, <<"\n">>, [global]))).
 
+join([H], _Sep)  -> H;
+join([H|T], Sep) ->
+  H++Sep++join(T, Sep).
+
 %%=============================================================================
 %% Tests
 
 -include_lib("eunit/include/eunit.hrl").
+
+convert_file_test() ->
+  Expected =
+    "{\n"
+    "\"service_job_id\": \"1234567890\",\n"
+    "\"service_name\": \"travis-ci\",\n"
+    "\"source_files\": [\n"
+    "{\n"
+    "\"name\": \"example.rb\",\n"
+    "\"source\": \"def four\n  4\nend\",\n"
+    "\"coverage\": [null,1,null]\n"
+    "},\n"
+    "{\n"
+    "\"name\": \"two.rb\",\n"
+    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
+    "\"coverage\": [null,1,0,null]\n"
+    "}\n"
+    "]\n"
+    "}",
+  ?assertEqual(Expected, convert_file("example.rb",
+                                      "1234567890",
+                                      "travis-ci",
+                                      mock_s())).
+
+convert_and_send_file_test() ->
+  Expected =
+    "{\n"
+    "\"service_job_id\": \"1234567890\",\n"
+    "\"service_name\": \"travis-ci\",\n"
+    "\"source_files\": [\n"
+    "{\n"
+    "\"name\": \"example.rb\",\n"
+    "\"source\": \"def four\n  4\nend\",\n"
+    "\"coverage\": [null,1,null]\n"
+    "},\n"
+    "{\n"
+    "\"name\": \"two.rb\",\n"
+    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
+    "\"coverage\": [null,1,0,null]\n"
+    "}\n"
+    "]\n"
+    "}",
+  ?assertEqual(ok, convert_and_send_file("example.rb",
+                                         "1234567890",
+                                         "travis-ci",
+                                         mock_s(Expected))).
+
+send_test_() ->
+  Expected =
+    "{\n"
+    "\"service_job_id\": \"1234567890\",\n"
+    "\"service_name\": \"travis-ci\",\n"
+    "\"source_files\": [\n"
+    "{\n"
+    "\"name\": \"example.rb\",\n"
+    "\"source\": \"def four\n  4\nend\",\n"
+    "\"coverage\": [null,1,null]\n"
+    "}\n]\n}",
+  [ ?_assertEqual(ok, send(Expected, mock_s(Expected)))
+  , ?_assertThrow({error, _}, send("foo", mock_s("bar")))
+  ].
+
+%%-----------------------------------------------------------------------------
+%% Generic helpers tests
 
 count_lines_test_() ->
   [ ?_assertEqual(0, count_lines(<<>>))
@@ -173,14 +258,17 @@ count_lines_test_() ->
   , ?_assertEqual(2, count_lines(<<"foo\nbar\n">>))
   ].
 
-create_cov_test() ->
-  ?assertEqual([null, 3, null, 4, null],
-               create_cov([{{foo, 2}, 3}, {{foo, 4}, 4}], 5)).
-
 join_test_() ->
   [ ?_assertEqual("a,b"   , join(["a","b"], ","))
   , ?_assertEqual("a,b,c" , join(["a","b","c"], ","))
   ].
+
+%%-----------------------------------------------------------------------------
+%% Converting modules tests
+
+create_cov_test() ->
+  ?assertEqual([null, 3, null, 4, null],
+               create_cov([{{foo, 2}, 3}, {{foo, 4}, 4}], 5)).
 
 convert_module_test() ->
   Expected =
@@ -208,28 +296,12 @@ convert_modules_test() ->
   ?assertEqual(Expected,
                convert_modules(mock_s())).
 
-convert_file_test() ->
-  Expected =
-    "{\n"
-    "\"service_job_id\": \"1234567890\",\n"
-    "\"service_name\": \"travis-ci\",\n"
-    "\"source_files\": [\n"
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\n  4\nend\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "},\n"
-    "{\n"
-    "\"name\": \"two.rb\",\n"
-    "\"source\": \"def seven\n  eight\n  nine\nend\",\n"
-    "\"coverage\": [null,1,0,null]\n"
-    "}\n"
-    "]\n"
-    "}",
-  ?assertEqual(Expected,
-               convert_file("example.rb", "1234567890", "travis-ci", mock_s())).
+%%-----------------------------------------------------------------------------
+%% Setup helpers
 
-mock_s() ->
+mock_s() -> mock_s("").
+
+mock_s(ExpectedJson) ->
   #s{ importer      =
         fun(_) -> ok end
     , module_lister =
@@ -250,6 +322,17 @@ mock_s() ->
                                                , {{'two.rb', 3}, 0}
                                                ]
                                           }
+        end
+    , poster_init   =
+        fun() -> ok end
+    , poster        =
+        fun(post, {_, _, _, Body}, _, _) ->
+            case Body of
+              "json_file=" ++ ExpectedJson ->
+                {ok, {{"", 200, ""}, "", ""}};
+              _                          ->
+                {ok, {{"", 666, ""}, "", "Not expected"}}
+            end
         end
     }.
 
