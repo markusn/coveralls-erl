@@ -32,13 +32,30 @@
 
 %%=============================================================================
 %% Module declaration
+
 -module(rebar_coveralls).
 
 %%=============================================================================
 %% Exports
 
+-export([ eunit/2 ]).
+
 %%=============================================================================
 %% API functions
+
+eunit(Conf, _) ->
+  io:format("HERE~n"),
+  File         = rebar_config:get_local(Conf, coveralls_coverdata, undef),
+  ServiceName  = rebar_config:get_local(Conf, coveralls_service_name, undef),
+  ServiceJobId = rebar_config:get_local(Conf, coveralls_service_job_id, undef),
+  F            = fun(X) -> X =:= undef end,
+  case lists:any(F, [File, ServiceName, ServiceJobId]) of
+    true  ->
+      throw({error, "need to specify coveralls_*"});
+    false ->
+      ok = coveralls:convert_and_send_file(File, ServiceName, ServiceJobId)
+  end.
+
 
 %%% Local Variables:
 %%% allout-layout: t
