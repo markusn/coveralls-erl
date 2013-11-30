@@ -168,8 +168,8 @@ convert_module(Mod, S) ->
   SrcFile            = proplists:get_value(source, compile_info(S, Mod)),
   Name               = filename:basename(SrcFile),
   {ok, SrcBin}       = read_file(S, SrcFile),
-  Src                = lists:flatten(io_lib:format("~s", [SrcBin])),
-  LinesCount         = count_lines(Src),
+  Src0               = lists:flatten(io_lib:format("~s", [SrcBin])),
+  LinesCount         = count_lines(Src0),
   Cov                = create_cov(CoveredLines, LinesCount),
   Str                =
     "{~n"
@@ -177,7 +177,12 @@ convert_module(Mod, S) ->
     "\"source\": \"~s\",~n"
     "\"coverage\": ~p~n"
     "}",
-  lists:flatten(io_lib:format(Str, [Name, replace_newlines(Src, "\\n"), Cov])).
+  Src                = replace_newlines(
+                         replace_quotes(
+                           replace_escape(Src0, "\\\\"),
+                           "\\\""),
+                         "\\n"),
+  lists:flatten(io_lib:format(Str, [Name, Src, Cov])).
 
 create_cov(_CoveredLines, [])                                    ->
   [];
@@ -196,9 +201,17 @@ count_lines(S) -> length(string:tokens(S, "\n")).
 join([H], _Sep)  -> H;
 join([H|T], Sep) -> H++Sep++join(T, Sep).
 
+replace_escape("", _)      -> "";
+replace_escape([$\\|S], A) -> A ++ replace_escape(S,A);
+replace_escape([E|S], A)   -> [E|replace_escape(S,A)].
+
 replace_newlines("", _)        -> "";
 replace_newlines("\n" ++ S, A) -> A ++ replace_newlines(S, A);
 replace_newlines([E|S], A)     -> [E|replace_newlines(S,A)].
+
+replace_quotes("", _)     -> "";
+replace_quotes([$"|S], A) -> A ++ replace_quotes(S, A);
+replace_quotes([E|S], A)  -> [E|replace_quotes(S,A)].
 
 %%=============================================================================
 %% Tests
