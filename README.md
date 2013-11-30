@@ -6,29 +6,36 @@ coveralls-erl
 Erlang module to convert and send cover data to coveralls.
 
 ## Example usage: rebar and Travis CI                                                                           
-In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your reba\
-r.config.script:                                                                                                
-```erlang                                                                                                       
-case os:getenv("TRAVIS_JOB_ID") of                                                                              
-  false -> CONFIG;                                                                                              
-  ""    -> CONFIG;                                                                                              
-  JobId -> lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId})               
-end.                                                                                                            
-```                                                                                                             
-                                                                                                                
+In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your `rebar.config.script`t:                                                                                                
+```erlang
+case os:getenv("TRAVIS_JOB_ID") of
+  false -> CONFIG;
+  ""    -> CONFIG;
+  JobId -> lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId})
+end.
+```
+
 This will ensure that rebar_coveralls will have access to the needed JobId.
 
-You will also need to add the following lines to your rebar.config:
+You will also need to add the following lines to your `rebar.config`:
 ```erlang                                                                                                       
-{deps                   , [{coveralls, ".*", {git, "git://github.com/markusn/coveralls-erl.git", "master"}}]}.
+{deps                   , [ { coveralls
+                            , ".*"
+                            , {git, "git://github.com/markusn/coveralls-erl.git", "master"}
+                            }
+                          ]}.
 {plugin_dir             , "deps/coveralls/src"}.
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
 {plugins                , [rebar_coveralls]}.
 {coveralls_coverdata    , ".eunit/eunit.coverdata"}.
 {coveralls_service_name , "travis-ci"}.
-```                                                                                                             
-With these modifications to your rebar configuration rebar_coveralls will run after eunit is finished and export the coverage data to coveralls.
+```
+These changes will add `coveralls-erl` as a dependency, tell `rebar` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `travis-ci`. 
+
+With these modifications to your rebar configuration `rebar_coveralls` will run after EUnit is finished and export the coverage data to coveralls.
+
+NOTE: It may be a good idea to add your own `rebar` binary to your repository to ensure that Travis CI runs with a rebar binary that supports the needed `cover_export_enabled` option.
 
 ## Author
 Markus Näsman (markus at botten dot org).
