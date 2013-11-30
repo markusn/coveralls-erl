@@ -164,14 +164,16 @@ convert_modules(S) ->
   "[\n" ++ join(lists:map(F, imported_modules(S)), ",\n") ++ "\n]\n".
 
 convert_module(Mod, S) ->
-  {ok, CoveredLines} = analyze(S, Mod),
-  SrcFile            = proplists:get_value(source, compile_info(S, Mod)),
-  Name               = filename:basename(SrcFile),
-  {ok, SrcBin}       = read_file(S, SrcFile),
-  Src0               = lists:flatten(io_lib:format("~s", [SrcBin])),
-  LinesCount         = count_lines(Src0),
-  Cov                = create_cov(CoveredLines, LinesCount),
-  Str                =
+  {ok, CoveredLines0} = analyze(S, Mod),
+  %% Remove strange 0 indexed line
+  FilterF             = fun({{_, X}, _}) -> X =/= 0 end,
+  CoveredLines        = lists:filter(FilterF, CoveredLines0),
+  SrcFile             = proplists:get_value(source, compile_info(S, Mod)),
+  {ok, SrcBin}        = read_file(S, SrcFile),
+  Src0                = lists:flatten(io_lib:format("~s", [SrcBin])),
+  LinesCount          = count_lines(Src0),
+  Cov                 = create_cov(CoveredLines, LinesCount),
+  Str                 =
     "{~n"
     "\"name\": \"~s\",~n"
     "\"source\": \"~s\",~n"
@@ -182,7 +184,7 @@ convert_module(Mod, S) ->
                            replace_escape(Src0, "\\\\"),
                            "\\\""),
                          "\\n"),
-  lists:flatten(io_lib:format(Str, [Name, Src, Cov])).
+  lists:flatten(io_lib:format(Str, [SrcFile, Src, Cov])).
 
 create_cov(_CoveredLines, [])                                    ->
   [];
@@ -196,7 +198,10 @@ create_cov(CoveredLines, [_|LineNos])                            ->
 %%-----------------------------------------------------------------------------
 %% Generic helpers
 
-count_lines(S) -> length(string:tokens(S, "\n")).
+count_lines("")      -> 1;
+count_lines("\n")    -> 1;
+count_lines([$\n|S]) -> 1+count_lines(S);
+count_lines([_|S])   -> count_lines(S).
 
 join([H], _Sep)  -> H;
 join([H|T], Sep) -> H++Sep++join(T, Sep).
@@ -283,10 +288,11 @@ send_test_() ->
 %% Generic helpers tests
 
 count_lines_test_() ->
-  [ ?_assertEqual(0, count_lines(""))
+  [ ?_assertEqual(1, count_lines(""))
   , ?_assertEqual(1, count_lines("foo"))
   , ?_assertEqual(1, count_lines("bar\n"))
   , ?_assertEqual(2, count_lines("foo\nbar"))
+  , ?_assertEqual(3, count_lines("foo\n\nbar"))
   , ?_assertEqual(2, count_lines("foo\nbar\n"))
   ].
 
@@ -342,13 +348,13 @@ mock_s(Json) ->
     , module_lister =
         fun() -> ['example.rb', 'two.rb'] end
     , mod_info      =
-        fun('example.rb') -> [{source,"/foo/example.rb"}];
-           ('two.rb')     -> [{source,"/foo/two.rb"}]
+        fun('example.rb') -> [{source,"example.rb"}];
+           ('two.rb')     -> [{source,"two.rb"}]
         end
     , file_reader   =
-        fun("/foo/example.rb") ->
+        fun("example.rb") ->
             {ok, <<"def four\n  4\nend">>};
-           ("/foo/two.rb")     ->
+           ("two.rb")     ->
             {ok, <<"def seven\n  eight\n  nine\nend">>}
         end
     , analyser      =
