@@ -79,9 +79,7 @@ eunit_test_() ->
   File           = "foo",
   ServiceJobId   = "123",
   ServiceName    = "bar",
-  ConvertAndSend = fun("foo", "123", "bar") -> ok;
-                      (_,_,_)               -> error
-                   end,
+  ConvertAndSend = fun("foo", "123", "bar") -> ok end,
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;

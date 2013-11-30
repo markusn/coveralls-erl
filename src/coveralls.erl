@@ -311,6 +311,15 @@ replace_quotes_test() ->
   ?assertEqual("foobarfoo", replace_quotes("foo\"foo", "bar")).
 
 %%-----------------------------------------------------------------------------
+%% Callback mockery tests
+module_info_compile_test() ->
+  ?assert(is_tuple(lists:keyfind(source, 1, module_info_compile(?MODULE)))).
+
+%% should always be ok
+poster_init_test() ->
+  ?assertEqual(ok, poster_init()).
+
+%%-----------------------------------------------------------------------------
 %% Converting modules tests
 
 create_cov_test() ->
