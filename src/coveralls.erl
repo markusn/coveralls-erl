@@ -52,8 +52,7 @@
            , file_reader   = fun file:read_file/1
            , analyser      = fun cover:analyse/3
            , poster        = fun httpc:request/4
-           , poster_init   = fun inets:start/0
-           , poster_stop   = fun inets:stop/0
+           , poster_init   = fun poster_init/0
            }).
 
 %%=============================================================================
@@ -84,8 +83,7 @@ convert_and_send_file(Filename, ServiceJobId, ServiceName) ->
 
 %% @doc Send json string to coveralls
 -spec send(string()) -> ok.
-send(Json) ->
-  send(Json, #s{}).
+send(Json) -> send(Json, #s{}).
 
 %%=============================================================================
 %% Internal functions
@@ -102,21 +100,20 @@ convert_file(Filename, ServiceJobId, ServiceName, S) ->
   lists:flatten(
     io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
 
-send(Json, #s{poster=Poster, poster_init=Init, poster_stop=Stop}) ->
+convert_and_send_file(Filename, ServiceJobId, ServiceName, S) ->
+  send(convert_file(Filename, ServiceJobId, ServiceName, S), S).
+
+send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
   Boundary = "----------" ++ integer_to_list(random:uniform(1000)),
   Type     = "multipart/form-data; boundary=" ++ Boundary,
   Body     = to_body(Json, Boundary),
   R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
   {ok, {{_, ReturnCode, _}, _, Message}} = R,
-  ok       = Stop(),
   case ReturnCode of
     200 -> ok;
     _   -> throw({error, Message})
   end.
-
-convert_and_send_file(Filename, ServiceJobId, ServiceName, S) ->
-  send(convert_file(Filename, ServiceJobId, ServiceName, S), S).
 
 %%-----------------------------------------------------------------------------
 %% HTTP helpers
@@ -130,29 +127,29 @@ to_body(Json, Boundary) ->
 %%-----------------------------------------------------------------------------
 %% Callback mockery
 
-import(#s{importer=F}, File) ->
-  F(File).
+import(#s{importer=F}, File) -> F(File).
 
-imported_modules(#s{module_lister=F}) ->
-  F().
+imported_modules(#s{module_lister=F}) -> F().
 
-analyze(#s{analyser=F}, Mod) ->
-  F(Mod, calls, line).
+analyze(#s{analyser=F}, Mod) -> F(Mod, calls, line).
 
-compile_info(#s{mod_info=F}, Mod) ->
-  F(Mod).
+compile_info(#s{mod_info=F}, Mod) -> F(Mod).
 
-module_info_compile(Mod) ->
-  Mod:module_info(compile).
+module_info_compile(Mod) -> Mod:module_info(compile).
 
-read_file(#s{file_reader=F}, SrcFile) ->
-  F(SrcFile).
+read_file(#s{file_reader=F}, SrcFile) -> F(SrcFile).
+
+poster_init() ->
+  case inets:start() of
+    {error,{already_started,_}} -> ok;
+    ok                          -> ok
+  end.
 
 %%-----------------------------------------------------------------------------
 %% Converting modules
 
 convert_modules(S) ->
-  F                = fun(Mod) -> convert_module(Mod, S) end,
+  F = fun(Mod) -> convert_module(Mod, S) end,
   "[\n" ++ join(lists:map(F, imported_modules(S)), ",\n") ++ "\n]\n".
 
 convert_module(Mod, S) ->
@@ -186,8 +183,7 @@ create_cov(CoveredLines, [_|LineNos])                            ->
 count_lines(S) -> length(string:tokens(S, "\n")).
 
 join([H], _Sep)  -> H;
-join([H|T], Sep) ->
-  H++Sep++join(T, Sep).
+join([H|T], Sep) -> H++Sep++join(T, Sep).
 
 replace_newlines("", _)        -> "";
 replace_newlines("\n" ++ S, A) -> A ++ replace_newlines(S, A);
@@ -332,11 +328,11 @@ mock_s(Json) ->
             {ok, <<"def seven\n  eight\n  nine\nend">>}
         end
     , analyser      =
-        fun('example.rb', calls, line) -> {ok, [{{'example.rb', 2}, 1}]};
-           ('two.rb', calls, line)     -> {ok, [ {{'two.rb', 2}, 1}
-                                               , {{'two.rb', 3}, 0}
-                                               ]
-                                          }
+        fun('example.rb' , calls, line) -> {ok, [ {{'example.rb', 2}, 1} ]};
+           ('two.rb'     , calls, line) -> {ok, [ {{'two.rb', 2}, 1}
+                                                , {{'two.rb', 3}, 0}
+                                                ]
+                                           }
         end
     , poster_init   =
         fun() -> ok end
@@ -347,8 +343,6 @@ mock_s(Json) ->
               false -> {ok, {{"", 666, ""}, "", "Not expected"}}
             end
         end
-    , poster_stop  =
-        fun() -> ok end
     }.
 
 %%% Local Variables:
