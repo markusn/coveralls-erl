@@ -44,7 +44,6 @@
 %% API functions
 
 eunit(Conf, _) ->
-  io:format("HERE~n"),
   File         = rebar_config:get_local(Conf, coveralls_coverdata, undef),
   ServiceName  = rebar_config:get_local(Conf, coveralls_service_name, undef),
   ServiceJobId = rebar_config:get_local(Conf, coveralls_service_job_id, undef),
