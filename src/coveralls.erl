@@ -302,7 +302,13 @@ join_test_() ->
   ].
 
 replace_newlines_test() ->
- ?assertEqual("foo\\nbar\\n", replace_newlines("foo\nbar\n", "\\n")).
+ ?assertEqual("foobarfoo", replace_newlines("foo\nfoo", "bar")).
+
+replace_escape_test() ->
+  ?assertEqual("foobarfoo", replace_escape("foo\\foo", "bar")).
+
+replace_quotes_test() ->
+  ?assertEqual("foobarfoo", replace_quotes("foo\"foo", "bar")).
 
 %%-----------------------------------------------------------------------------
 %% Converting modules tests
