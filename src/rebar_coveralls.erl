@@ -55,6 +55,9 @@ eunit(Conf, _) ->
              "need to specify coveralls_* and cover_export_enabled "
              "in rebar.config"});
     false ->
+      io:format("rebar_coveralls:"
+                "Exporting cover data from ~s using service ~s and jobid ~s~n",
+                [File, ServiceName, ServiceJobId]),
       ok = coveralls:convert_and_send_file(File, ServiceName, ServiceJobId)
   end.
 
