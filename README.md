@@ -6,7 +6,7 @@ coveralls-erl
 Erlang module to convert and send cover data to coveralls.
 
 ## Example usage: rebar and Travis CI                                                                           
-In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your `rebar.config.script`t:                                                                                                
+In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your `rebar.config.script`:                                                                                                
 ```erlang
 case os:getenv("TRAVIS_JOB_ID") of
   false -> CONFIG;
