@@ -58,7 +58,7 @@ eunit(Conf, _) ->
       io:format("rebar_coveralls:"
                 "Exporting cover data from ~s using service ~s and jobid ~s~n",
                 [File, ServiceName, ServiceJobId]),
-      ok = coveralls:convert_and_send_file(File, ServiceName, ServiceJobId)
+      ok = coveralls:convert_and_send_file(File, ServiceJobId, ServiceName)
   end.
 
 

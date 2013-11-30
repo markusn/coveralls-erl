@@ -111,8 +111,8 @@ send(Json, #s{poster=Poster, poster_init=Init}) ->
   R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
   {ok, {{_, ReturnCode, _}, _, Message}} = R,
   case ReturnCode of
-    200 -> ok;
-    _   -> throw({error, Message})
+    200      -> ok;
+    ErrCode  -> throw({error, {ErrCode, Message}})
   end.
 
 %%-----------------------------------------------------------------------------
@@ -276,7 +276,7 @@ send_test_() ->
     "\"coverage\": [null,1,null]\n"
     "}\n]\n}",
   [ ?_assertEqual(ok, send(Expected, mock_s(Expected)))
-  , ?_assertThrow({error, _}, send("foo", mock_s("bar")))
+  , ?_assertThrow({error, {_,_}}, send("foo", mock_s("bar")))
   ].
 
 %%-----------------------------------------------------------------------------
