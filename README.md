@@ -8,14 +8,18 @@ Erlang module to convert and send cover data to coveralls.
 ## Example usage: rebar and Travis CI                                                                           
 In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your `rebar.config.script`:                                                                                                
 ```erlang
-case os:getenv("TRAVIS_JOB_ID") of
-  false -> CONFIG;
-  ""    -> CONFIG;
-  JobId -> lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId})
+case os:getenv("TRAVIS") of
+  "true" ->
+    JobId   = os:getenv("TRAVIS_JOB_ID"),
+    CONFIG1 = lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId}),
+    lists:keystore(plugins, 1, CONFIG1, {plugins, [rebar_coveralls]});
+  _ ->
+    CONFIG
+end.
 end.
 ```
 
-This will ensure that rebar_coveralls will have access to the needed JobId.
+This will ensure that rebar_coveralls will have access to the needed JobId and that the plugin is only run from Travis CI.
 
 You will also need to add the following lines to your `rebar.config`:
 ```erlang                                                                                                       
@@ -27,7 +31,6 @@ You will also need to add the following lines to your `rebar.config`:
 {plugin_dir             , "deps/coveralls/src"}.
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
-{plugins                , [rebar_coveralls]}.
 {coveralls_coverdata    , ".eunit/eunit.coverdata"}.
 {coveralls_service_name , "travis-ci"}.
 ```
