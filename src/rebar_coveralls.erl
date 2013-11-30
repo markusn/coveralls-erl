@@ -44,11 +44,20 @@
 %% API functions
 
 eunit(Conf, _) ->
-  File         = rebar_config:get_local(Conf, coveralls_coverdata, undef),
-  ServiceName  = rebar_config:get_local(Conf, coveralls_service_name, undef),
-  ServiceJobId = rebar_config:get_local(Conf, coveralls_service_job_id, undef),
+  ConvertAndSend = fun coveralls:convert_and_send_file/3,
+  Get            = fun(Key, Def) -> rebar_config:get(Conf, Key, Def) end,
+  GetLocal       = fun(Key, Def) -> rebar_config:get_local(Conf, Key, Def) end,
+  eunit(ConvertAndSend, Get, GetLocal).
+
+%%=============================================================================
+%% Internal functions
+
+eunit(ConvertAndSend, Get, GetLocal) ->
+  File         = GetLocal(coveralls_coverdata, undef),
+  ServiceName  = GetLocal(coveralls_service_name, undef),
+  ServiceJobId = GetLocal(coveralls_service_job_id, undef),
   F            = fun(X) -> X =:= undef orelse X =:= false end,
-  CoverExport  = rebar_config:get(Conf, cover_export_enabled, false),
+  CoverExport  = Get(cover_export_enabled, false),
   case lists:any(F, [File, ServiceName, ServiceJobId, CoverExport]) of
     true  ->
       throw({error,
@@ -58,9 +67,30 @@ eunit(Conf, _) ->
       io:format("rebar_coveralls:"
                 "Exporting cover data from ~s using service ~s and jobid ~s~n",
                 [File, ServiceName, ServiceJobId]),
-      ok = coveralls:convert_and_send_file(File, ServiceJobId, ServiceName)
+      ok = ConvertAndSend(File, ServiceJobId, ServiceName)
   end.
 
+%%=============================================================================
+%% Tests
+
+-include_lib("eunit/include/eunit.hrl").
+
+eunit_test_() ->
+  File           = "foo",
+  ServiceJobId   = "123",
+  ServiceName    = "bar",
+  ConvertAndSend = fun("foo", "123", "bar") -> ok;
+                      (_,_,_)               -> error
+                   end,
+  Get            = fun(cover_export_enabled, _) -> true end,
+  GetLocal       = fun(coveralls_coverdata, _)      -> File;
+                      (coveralls_service_name, _)   -> ServiceName;
+                      (coveralls_service_job_id, _) -> ServiceJobId
+                   end,
+  GetBroken     = fun(cover_export_enabled, _) -> false end,
+  [ ?_assertEqual(ok, eunit(ConvertAndSend, Get, GetLocal))
+  , ?_assertThrow({error, _}, eunit(ConvertAndSend, GetBroken, GetLocal))
+  ].
 
 %%% Local Variables:
 %%% allout-layout: t
