@@ -140,6 +140,16 @@ module_info_compile(Mod) -> Mod:module_info(compile).
 read_file(#s{file_reader=F}, SrcFile) -> F(SrcFile).
 
 poster_init() ->
+  ok = inets_init(),
+  ok = ssl_init().
+
+ssl_init() ->
+  case ssl:start() of
+    {error,{already_started,_}} -> ok;
+    ok                          -> ok
+  end.
+
+inets_init() ->
   case inets:start() of
     {error,{already_started,_}} -> ok;
     ok                          -> ok
