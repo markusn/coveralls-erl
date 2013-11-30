@@ -47,10 +47,13 @@ eunit(Conf, _) ->
   File         = rebar_config:get_local(Conf, coveralls_coverdata, undef),
   ServiceName  = rebar_config:get_local(Conf, coveralls_service_name, undef),
   ServiceJobId = rebar_config:get_local(Conf, coveralls_service_job_id, undef),
-  F            = fun(X) -> X =:= undef end,
-  case lists:any(F, [File, ServiceName, ServiceJobId]) of
+  F            = fun(X) -> X =:= undef orelse X =:= false end,
+  CoverExport  = rebar_config:get(Conf, cover_export_enabled, false),
+  case lists:any(F, [File, ServiceName, ServiceJobId, CoverExport]) of
     true  ->
-      throw({error, "need to specify coveralls_*"});
+      throw({error,
+             "need to specify coveralls_* and cover_export_enabled "
+             "in rebar.config"});
     false ->
       ok = coveralls:convert_and_send_file(File, ServiceName, ServiceJobId)
   end.
