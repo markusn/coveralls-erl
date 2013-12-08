@@ -40,7 +40,6 @@
 
 -export([ convert_file/3
         , convert_and_send_file/3
-        , send/1
         ]).
 
 %%=============================================================================
@@ -52,7 +51,7 @@
            , file_reader   = fun file:read_file/1
            , analyser      = fun cover:analyse/3
            , poster        = fun httpc:request/4
-           , poster_init   = fun poster_init/0
+           , poster_init   = start_wrapper([fun ssl:start/0, fun inets:start/0])
            }).
 
 %%=============================================================================
@@ -80,10 +79,6 @@ convert_file(Filename, ServiceJobId, ServiceName) ->
 -spec convert_and_send_file(string(), string(), string()) -> ok.
 convert_and_send_file(Filename, ServiceJobId, ServiceName) ->
   convert_and_send_file(Filename, ServiceJobId, ServiceName, #s{}).
-
-%% @doc Send json string to coveralls
--spec send(string()) -> ok.
-send(Json) -> send(Json, #s{}).
 
 %%=============================================================================
 %% Internal functions
@@ -140,18 +135,13 @@ module_info_compile(Mod) -> Mod:module_info(compile).
 
 read_file(#s{file_reader=F}, SrcFile) -> F(SrcFile).
 
-poster_init() ->
-  ok = inets_init(),
-  ok = ssl_init().
-
-ssl_init() ->
-  case ssl:start() of
-    {error,{already_started,_}} -> ok;
-    ok                          -> ok
+start_wrapper(Funs) ->
+  fun() ->
+      lists:foreach(fun(F) -> ok = wrap_start(F) end, Funs)
   end.
 
-inets_init() ->
-  case inets:start() of
+wrap_start(StartFun) ->
+  case StartFun() of
     {error,{already_started,_}} -> ok;
     ok                          -> ok
   end.
@@ -179,11 +169,7 @@ convert_module(Mod, S) ->
     "\"source\": \"~s\",~n"
     "\"coverage\": ~p~n"
     "}",
-  Src                = replace_newlines(
-                         replace_quotes(
-                           replace_escape(Src0, "\\\\"),
-                           "\\\""),
-                         "\\n"),
+  Src                = escape_str(Src0),
   lists:flatten(io_lib:format(Str, [SrcFile, Src, Cov])).
 
 create_cov(_CoveredLines, [])                                    ->
@@ -203,20 +189,19 @@ count_lines("\n")    -> 1;
 count_lines([$\n|S]) -> 1+count_lines(S);
 count_lines([_|S])   -> count_lines(S).
 
+escape_str(Str) ->
+  Funs = [ fun(S) -> replace_char(S, $\\, "\\\\") end
+         , fun(S) -> replace_char(S, $\n, "\\n") end
+         , fun(S) -> replace_char(S, $", "\\\"") end
+         ],
+  lists:foldl(fun(F, S) -> F(S) end, Str, Funs).
+
 join([H], _Sep)  -> H;
 join([H|T], Sep) -> H++Sep++join(T, Sep).
 
-replace_escape("", _)      -> "";
-replace_escape([$\\|S], A) -> A ++ replace_escape(S,A);
-replace_escape([E|S], A)   -> [E|replace_escape(S,A)].
-
-replace_newlines("", _)        -> "";
-replace_newlines("\n" ++ S, A) -> A ++ replace_newlines(S, A);
-replace_newlines([E|S], A)     -> [E|replace_newlines(S,A)].
-
-replace_quotes("", _)     -> "";
-replace_quotes([$"|S], A) -> A ++ replace_quotes(S, A);
-replace_quotes([E|S], A)  -> [E|replace_quotes(S,A)].
+replace_char("", _, _)    -> "";
+replace_char([E|S], E, R) -> R ++ replace_char(S, E, R);
+replace_char([C|S], E, R) -> [C | replace_char(S, E, R)].
 
 %%=============================================================================
 %% Tests
@@ -301,23 +286,24 @@ join_test_() ->
   , ?_assertEqual("a,b,c" , join(["a","b","c"], ","))
   ].
 
-replace_newlines_test() ->
- ?assertEqual("foobarfoo", replace_newlines("foo\nfoo", "bar")).
-
-replace_escape_test() ->
-  ?assertEqual("foobarfoo", replace_escape("foo\\foo", "bar")).
-
-replace_quotes_test() ->
-  ?assertEqual("foobarfoo", replace_quotes("foo\"foo", "bar")).
+replce_char_test_() ->
+  [ ?_assertEqual("foobarfoo", replace_char("foo\nfoo", $\n, "bar"))
+  , ?_assertEqual("foobarfoo", replace_char("foo\\foo", $\\, "bar"))
+  , ?_assertEqual("foobarfoo", replace_char("foo\"foo", $", "bar")) %"
+  ].
 
 %%-----------------------------------------------------------------------------
 %% Callback mockery tests
 module_info_compile_test() ->
   ?assert(is_tuple(lists:keyfind(source, 1, module_info_compile(?MODULE)))).
 
-%% should always be ok
-poster_init_test() ->
-  ?assertEqual(ok, poster_init()).
+start_wrapper_test_() ->
+  F        = fun() -> ok end,
+  StartedF = fun() -> {error,{already_started,mod}} end,
+  ErrorF   = fun() -> {error, {error, mod}} end,
+  [ ?_assertEqual(ok, (start_wrapper([F, StartedF]))())
+  , ?_assertError(_, (start_wrapper([F, StartedF, ErrorF]))())
+  ].
 
 %%-----------------------------------------------------------------------------
 %% Converting modules tests
