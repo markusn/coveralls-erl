@@ -38,21 +38,28 @@
 %%=============================================================================
 %% Exports
 
--export([ eunit/2 ]).
+-export([ ct/2, eunit/2 ]).
 
 %%=============================================================================
 %% API functions
 
+ct(Conf, _) ->
+  coveralls(Conf).
+
 eunit(Conf, _) ->
-  ConvertAndSend = fun coveralls:convert_and_send_file/3,
-  Get            = fun(Key, Def) -> rebar_config:get(Conf, Key, Def) end,
-  GetLocal       = fun(Key, Def) -> rebar_config:get_local(Conf, Key, Def) end,
-  eunit(ConvertAndSend, Get, GetLocal).
+  coveralls(Conf).
 
 %%=============================================================================
 %% Internal functions
 
-eunit(ConvertAndSend, Get, GetLocal) ->
+coveralls(Conf) ->
+  ConvertAndSend = fun coveralls:convert_and_send_file/3,
+  Get            = fun(Key, Def) -> rebar_config:get(Conf, Key, Def) end,
+  GetLocal       = fun(Key, Def) -> rebar_config:get_local(Conf, Key, Def) end,
+  do_coveralls(ConvertAndSend, Get, GetLocal).
+
+
+do_coveralls(ConvertAndSend, Get, GetLocal) ->
   File         = GetLocal(coveralls_coverdata, undef),
   ServiceName  = GetLocal(coveralls_service_name, undef),
   ServiceJobId = GetLocal(coveralls_service_job_id, undef),
@@ -86,8 +93,8 @@ eunit_test_() ->
                       (coveralls_service_job_id, _) -> ServiceJobId
                    end,
   GetBroken     = fun(cover_export_enabled, _) -> false end,
-  [ ?_assertEqual(ok, eunit(ConvertAndSend, Get, GetLocal))
-  , ?_assertThrow({error, _}, eunit(ConvertAndSend, GetBroken, GetLocal))
+  [ ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocal))
+  , ?_assertThrow({error, _}, do_coveralls(ConvertAndSend, GetBroken, GetLocal))
   ].
 
 %%% Local Variables:
