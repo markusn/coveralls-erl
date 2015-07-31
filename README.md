@@ -16,7 +16,6 @@ case os:getenv("TRAVIS") of
   _ ->
     CONFIG
 end.
-end.
 ```
 
 This will ensure that rebar_coveralls will have access to the needed JobId and that the plugin is only run from Travis CI.
