@@ -218,6 +218,7 @@ count_lines([_|S])   -> count_lines(S).
 escape_str(Str) ->
   Funs = [ fun(S) -> replace_char(S, $\\, "\\\\") end
          , fun(S) -> replace_char(S, $\n, "\\n") end
+         , fun(S) -> replace_char(S, $\t, "\\t") end
          , fun(S) -> replace_char(S, $", "\\\"") end
          ],
   lists:foldl(fun(F, S) -> F(S) end, Str, Funs).
@@ -290,7 +291,7 @@ send_test_() ->
     "\"source_files\": [\n"
     "{\n"
     "\"name\": \"example.rb\",\n"
-    "\"source\": \"def four\\n  4\\nend\",\n"
+    "\"source\": \"\tdef four\\n  4\\nend\",\n"
     "\"coverage\": [null,1,null]\n"
     "}\n]\n}",
   [ ?_assertEqual(ok, send(Expected, mock_s(Expected)))
