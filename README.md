@@ -40,7 +40,7 @@ With these modifications to your rebar configuration `rebar_coveralls` will run 
 NOTE: It may be a good idea to add your own `rebar` binary to your repository to ensure that Travis CI runs with a rebar binary that supports the needed `cover_export_enabled` option.
 
 ## Author
-Markus Näsman (markus at botten dot org).
+Markus Ekholm (markus at botten dot org).
 
 ## License
 3-clause BSD. For details see `COPYING`.
