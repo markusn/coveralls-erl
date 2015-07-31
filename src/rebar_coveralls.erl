@@ -38,29 +38,31 @@
 %%=============================================================================
 %% Exports
 
--export([ ct/2, eunit/2 ]).
+-export([ ct/2, eunit/2, 'send-coveralls'/2 ]).
 
 %%=============================================================================
 %% API functions
-
 ct(Conf, _) ->
-  true = code:add_path(rebar_utils:ebin_dir()),
-  coveralls(Conf).
+  coveralls(Conf, ct).
 
 eunit(Conf, _) ->
-  coveralls(Conf).
+  coveralls(Conf, eunit).
+
+'send-coveralls'(Conf, _) ->
+  coveralls(Conf, 'send-coveralls').
 
 %%=============================================================================
 %% Internal functions
 
-coveralls(Conf) ->
+coveralls(Conf, Task) ->
   ConvertAndSend = fun coveralls:convert_and_send_file/3,
   Get            = fun(Key, Def) -> rebar_config:get(Conf, Key, Def) end,
   GetLocal       = fun(Key, Def) -> rebar_config:get_local(Conf, Key, Def) end,
-  do_coveralls(ConvertAndSend, Get, GetLocal).
+  MaybeSkip      = fun() -> ok end,
+  true = code:add_path(rebar_utils:ebin_dir()),
+  do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task).
 
-
-do_coveralls(ConvertAndSend, Get, GetLocal) ->
+do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   File         = GetLocal(coveralls_coverdata, undef),
   ServiceName  = GetLocal(coveralls_service_name, undef),
   ServiceJobId = GetLocal(coveralls_service_job_id, undef),
@@ -72,18 +74,26 @@ do_coveralls(ConvertAndSend, Get, GetLocal) ->
              "need to specify coveralls_* and cover_export_enabled "
              "in rebar.config"});
     false ->
-      io:format("rebar_coveralls:"
-                "Exporting cover data from ~s using service ~s and jobid ~s~n",
-                [File, ServiceName, ServiceJobId]),
-      ok = ConvertAndSend(File, ServiceJobId, ServiceName)
+      DoCoveralls = (GetLocal(do_coveralls_after_ct, true) andalso Task == ct) orelse 
+                    (GetLocal(do_coveralls_after_eunit, true) andalso Task == eunit) orelse
+                    Task == 'send-coveralls',
+      case DoCoveralls of
+        true ->
+          io:format("rebar_coveralls:"
+                    "Exporting cover data from ~s using service ~s and jobid ~s~n",
+                    [File, ServiceName, ServiceJobId]),
+          ok = ConvertAndSend(File, ServiceJobId, ServiceName);
+        _ -> MaybeSkip()
+      end
   end.
+
 
 %%=============================================================================
 %% Tests
 
 -include_lib("eunit/include/eunit.hrl").
 
-eunit_test_() ->
+task_test_() ->
   File           = "foo",
   ServiceJobId   = "123",
   ServiceName    = "bar",
@@ -91,11 +101,26 @@ eunit_test_() ->
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;
-                      (coveralls_service_job_id, _) -> ServiceJobId
+                      (coveralls_service_job_id, _) -> ServiceJobId;
+                      (do_coveralls_after_eunit, _) -> true;
+                      (do_coveralls_after_ct, _)    -> true
+                   end,
+  GetLocalWithCoverallsTask  
+                 = fun(coveralls_coverdata, _)      -> File;
+                      (coveralls_service_name, _)   -> ServiceName;
+                      (coveralls_service_job_id, _) -> ServiceJobId;
+                      (do_coveralls_after_eunit, _) -> false;
+                      (do_coveralls_after_ct, _)    -> false
                    end,
   GetBroken     = fun(cover_export_enabled, _) -> false end,
-  [ ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocal))
-  , ?_assertThrow({error, _}, do_coveralls(ConvertAndSend, GetBroken, GetLocal))
+  MaybeSkip     = fun() -> skip end,
+  [ ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, eunit))
+  , ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, ct))
+  , ?_assertThrow({error, _}, do_coveralls(ConvertAndSend, GetBroken, GetLocal, MaybeSkip, eunit))
+  , ?_assertThrow({error, _}, do_coveralls(ConvertAndSend, GetBroken, GetLocal, MaybeSkip, ct))
+  , ?_assertEqual(skip, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, eunit))
+  , ?_assertEqual(skip, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, ct))
+  , ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, 'send-coveralls'))
   ].
 
 %%% Local Variables:

@@ -117,7 +117,7 @@ to_body(Json, Boundary) ->
   "--" ++ Boundary ++ "\r\n" ++
     "Content-Disposition: form-data; name=\"json_file\"; "
     "filename=\"json_file.json\" \r\n"
-    "Content-Type: application/octet-stream\r\n\r\n"
+    "Content-Type: application/json\r\n\r\n"
     ++ Json ++ "\r\n" ++ "--" ++ Boundary ++ "--" ++ "\r\n".
 
 %%-----------------------------------------------------------------------------

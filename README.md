@@ -35,7 +35,14 @@ You will also need to add the following lines to your `rebar.config`:
 ```
 These changes will add `coveralls-erl` as a dependency, tell `rebar` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `travis-ci`. 
 
-With these modifications to your rebar configuration `rebar_coveralls` will run after EUnit is finished and export the coverage data to coveralls.
+With these modifications to your rebar configuration `rebar_coveralls` will run after EUnit or CT is finished and export the coverage data to coveralls.
+If you don't want to export data to coveralls after EUnit or CT is finished you can disable it for each task:
+```erlang
+{do_coveralls_after_ct, false}.
+{do_coveralls_after_eunit, false}.
+```
+and use `send-coveralls` task: `rebar skip_deps=true eunit ct send-coveralls`
+
 
 NOTE: It may be a good idea to add your own `rebar` binary to your repository to ensure that Travis CI runs with a rebar binary that supports the needed `cover_export_enabled` option.
 
