@@ -131,8 +131,18 @@ analyze(#s{analyser=F}, Mod) -> F(Mod, calls, line).
 
 compile_info(#s{mod_info=F}, Mod) -> F(Mod).
 
+-ifdef(TEST).
 module_info_compile(Mod) -> Mod:module_info(compile).
+-else.
+module_info_compile(Mod) ->
+  code:load_file(Mod),
+  case code:is_loaded(Mod) of
+      {file, _} -> Mod:module_info(compile);
+      _         -> []
+  end.
+-endif.
 
+read_file(#s{file_reader=_F}, "") -> {ok, <<"">>};
 read_file(#s{file_reader=F}, SrcFile) -> F(SrcFile).
 
 start_wrapper(Funs) ->
@@ -156,21 +166,37 @@ convert_modules(S) ->
 convert_module(Mod, S) ->
   {ok, CoveredLines0} = analyze(S, Mod),
   %% Remove strange 0 indexed line
-  FilterF             = fun({{_, X}, _}) -> X =/= 0 end,
-  CoveredLines        = lists:filter(FilterF, CoveredLines0),
-  SrcFile             = proplists:get_value(source, compile_info(S, Mod)),
-  {ok, SrcBin}        = read_file(S, SrcFile),
-  Src0                = lists:flatten(io_lib:format("~s", [SrcBin])),
-  LinesCount          = count_lines(Src0),
-  Cov                 = create_cov(CoveredLines, LinesCount),
-  Str                 =
-    "{~n"
-    "\"name\": \"~s\",~n"
-    "\"source\": \"~s\",~n"
-    "\"coverage\": ~p~n"
-    "}",
-  Src                = escape_str(Src0),
-  lists:flatten(io_lib:format(Str, [SrcFile, Src, Cov])).
+  FilterF      = fun({{_, X}, _}) -> X =/= 0 end,
+  CoveredLines = lists:filter(FilterF, CoveredLines0),
+  case proplists:get_value(source, compile_info(S, Mod), "") of
+    "" -> "";
+    SrcFile ->
+          {ok, SrcBin} = read_file(S, SrcFile),
+          Src0         = lists:flatten(io_lib:format("~s", [SrcBin])),
+          LinesCount   = count_lines(Src0),
+          Cov          = create_cov(CoveredLines, LinesCount),
+          Str          =
+            "{~n"
+            "\"name\": \"~s\",~n"
+            "\"source\": \"~s\",~n"
+            "\"coverage\": ~p~n"
+            "}",
+          Src = escape_str(Src0),
+          lists:flatten(io_lib:format(Str, [relative_to_cwd(SrcFile), Src, Cov]))
+  end.
+
+relative_to_cwd(Path) ->
+    case file:get_cwd() of
+      {ok, Base} -> relative_to(Path, Base);
+      _ -> Path
+    end.
+
+relative_to(Path, From) ->
+    relative_to(filename:split(Path), filename:split(From), Path).
+
+relative_to([H|T1], [H|T2], Original) -> relative_to(T1, T2, Original);
+relative_to([_|_] = L1, [], _Original) -> filename:join(L1);
+relative_to(_, _, Original) -> Original.
 
 create_cov(_CoveredLines, [])                                    ->
   [];
@@ -196,8 +222,10 @@ escape_str(Str) ->
          ],
   lists:foldl(fun(F, S) -> F(S) end, Str, Funs).
 
-join([H], _Sep)  -> H;
-join([H|T], Sep) -> H++Sep++join(T, Sep).
+join(List, Sep) -> join1([E || E <- List, E /= ""], Sep).
+
+join1([H], _Sep)  -> H;
+join1([H|T], Sep) -> H++Sep++join1(T, Sep).
 
 replace_char("", _, _)    -> "";
 replace_char([E|S], E, R) -> R ++ replace_char(S, E, R);
@@ -284,6 +312,8 @@ count_lines_test_() ->
 join_test_() ->
   [ ?_assertEqual("a,b"   , join(["a","b"], ","))
   , ?_assertEqual("a,b,c" , join(["a","b","c"], ","))
+  , ?_assertEqual("a,c" , join(["a","","c"], ","))
+  , ?_assertEqual("a,b" , join(["a","b",""], ","))
   ].
 
 replce_char_test_() ->

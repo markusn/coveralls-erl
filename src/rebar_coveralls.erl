@@ -44,6 +44,7 @@
 %% API functions
 
 ct(Conf, _) ->
+  true = code:add_path(rebar_utils:ebin_dir()),
   coveralls(Conf).
 
 eunit(Conf, _) ->
