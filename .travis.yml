@@ -1,4 +1,6 @@
 language: erlang
+sudo: false
 otp_release:
-   - R16B
+  - 18.0
+  - R16B
 script: "./rebar compile && ./rebar skip_deps=true eunit"
