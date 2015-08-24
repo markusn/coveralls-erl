@@ -4,5 +4,6 @@
  , {modules, []}
  , {registred, []}
  , {applications,[kernel, stdlib]}
+ , {env, [providers, [rebar3_coveralls]]}
  ]
 }.

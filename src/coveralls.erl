@@ -185,14 +185,29 @@ convert_module(Mod, S) ->
           lists:flatten(io_lib:format(Str, [relative_to_cwd(SrcFile), Src, Cov]))
   end.
 
+fullpath([], Acc) -> filename:join(lists:reverse(Acc));
+fullpath(["."|Tail], Acc) -> fullpath(Tail, Acc);
+fullpath([".."|Tail], Acc=[_]) -> fullpath(Tail, Acc);
+fullpath([".."|Tail], [_|Acc]) -> fullpath(Tail, Acc);
+fullpath([Segment|Tail], Acc) -> fullpath(Tail, [Segment|Acc]).
+
 relative_to_cwd(Path) ->
-    case file:get_cwd() of
-      {ok, Base} -> relative_to(Path, Base);
-      _ -> Path
-    end.
+  case file:get_cwd() of
+    {ok, Base} -> relative_to(Path, Base);
+    _ -> Path
+  end.
 
 relative_to(Path, From) ->
-    relative_to(filename:split(Path), filename:split(From), Path).
+  Dirname = filename:dirname(Path),
+  Basename = filename:basename(Path),
+  Path1 = case file:read_link(Dirname) of
+    {ok, Link} ->
+      Link1 = filename:join(filename:join("..", Link), Basename),
+      Path0 = filename:split(filename:join(Dirname, Link1)),
+      fullpath(Path0, []);
+    _ -> Path
+  end,
+  relative_to(filename:split(Path1), filename:split(From), Path).
 
 relative_to([H|T1], [H|T2], Original) -> relative_to(T1, T2, Original);
 relative_to([_|_] = L1, [], _Original) -> filename:join(L1);
@@ -321,6 +336,12 @@ replce_char_test_() ->
   [ ?_assertEqual("foobarfoo", replace_char("foo\nfoo", $\n, "bar"))
   , ?_assertEqual("foobarfoo", replace_char("foo\\foo", $\\, "bar"))
   , ?_assertEqual("foobarfoo", replace_char("foo\"foo", $", "bar")) %"
+  ].
+
+fullpath_test_() ->
+  [ ?_assertEqual("/a/b", fullpath(["/", "a", "b"], []))
+  , ?_assertEqual("a/c", fullpath(["a", "b", "..", ".", "c"], []))
+  , ?_assertEqual("/", fullpath(["..", ".", "/"], []))
   ].
 
 %%-----------------------------------------------------------------------------

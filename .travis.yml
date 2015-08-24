@@ -1,6 +1,19 @@
+before_install:
+   - wget https://github.com/rebar/rebar/wiki/rebar
+   - wget https://s3.amazonaws.com/rebar3/rebar3
+   - chmod u+x ./rebar
+   - chmod u+x ./rebar3
+install: "true"
 language: erlang
 sudo: false
 otp_release:
   - 18.0
   - R16B
-script: "./rebar compile && ./rebar skip_deps=true eunit"
+env:
+  - REBAR3=false
+  - REBAR3=true
+script: 
+    - case "$REBAR3" in
+        false) ./rebar compile && ./rebar skip_deps=true eunit;;
+        true) ./rebar3 eunit skip_deps=true;;
+      esac

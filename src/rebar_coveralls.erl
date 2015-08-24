@@ -39,6 +39,7 @@
 %% Exports
 
 -export([ ct/2, eunit/2, 'send-coveralls'/2 ]).
+-export([ do_coveralls/5 ]).
 
 %%=============================================================================
 %% API functions
