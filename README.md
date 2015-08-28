@@ -46,6 +46,17 @@ and use `send-coveralls` task: `rebar skip_deps=true eunit ct send-coveralls`
 
 NOTE: It may be a good idea to add your own `rebar` binary to your repository to ensure that Travis CI runs with a rebar binary that supports the needed `cover_export_enabled` option.
 
+It also works with rebar3, example of `rebar.confg`
+```erlang                                                                                                       
+{plugins                , [{coveralls, {git, "https://github.com/markusn/coveralls-erl", "master"}}]}.
+{cover_enabled          , true}.
+{cover_export_enabled   , true}.
+{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}.
+{coveralls_service_name , "travis-ci"}.
+```
+
+And you cand send coverdata to coveralls: `rebar3 coveralls send`
+
 ## Author
 Markus Ekholm (markus at botten dot org).
 
