@@ -41,12 +41,13 @@ If you don't want to export data to coveralls after EUnit or CT is finished you 
 {do_coveralls_after_ct, false}.
 {do_coveralls_after_eunit, false}.
 ```
-and use `send-coveralls` task: `rebar skip_deps=true eunit ct send-coveralls`
-
+and use the `send-coveralls` task: `rebar skip_deps=true eunit ct send-coveralls`
 
 NOTE: It may be a good idea to add your own `rebar` binary to your repository to ensure that Travis CI runs with a rebar binary that supports the needed `cover_export_enabled` option.
 
-It also works with rebar3, example of `rebar.confg`
+## Example usage: rebar3 and Travis CI                                                                           
+
+Example `rebar.confg`:
 ```erlang                                                                                                       
 {plugins                , [{coveralls, {git, "https://github.com/markusn/coveralls-erl", "master"}}]}.
 {cover_enabled          , true}.
@@ -55,7 +56,7 @@ It also works with rebar3, example of `rebar.confg`
 {coveralls_service_name , "travis-ci"}.
 ```
 
-And you cand send coverdata to coveralls: `rebar3 coveralls send`
+And you send coverdata to coveralls by issuing: `rebar3 coveralls send`
 
 ## Author
 Markus Ekholm (markus at botten dot org).
