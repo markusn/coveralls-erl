@@ -62,8 +62,18 @@ do(State) ->
   GetLocal       = fun(Key, Def) -> rebar_state:get(State, Key, Def) end,
   MaybeSkip      = fun() -> ok end,
   ok = cover_paths(State),
-  rebar_coveralls:do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, 'send-coveralls'),
-  {ok, State}.
+  try
+    rebar_coveralls:do_coveralls(ConvertAndSend,
+                                 Get,
+                                 GetLocal,
+                                 MaybeSkip,
+                                 'send-coveralls'),
+    {ok, State}
+  catch throw:{error, {ErrCode, Msg}} ->
+      io:format("Failed sending coverdata to coveralls, ~p: ~p",
+                [ErrCode, Msg]),
+      {error, rebar_abort}
+  end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
