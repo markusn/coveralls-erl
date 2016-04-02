@@ -33,7 +33,10 @@
 -module(rebar3_coveralls).
 -behaviour(provider).
 
--export([init/1, do/1, format_error/1]).
+-export([ init/1
+        , do/1
+        , format_error/1
+        ]).
 
 -define(PROVIDER, send).
 -define(DEPS, [{default, app_discovery}]).
@@ -43,15 +46,16 @@
 %% ===================================================================
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-  Provider = providers:create([{name,       ?PROVIDER},
-                               {module,     ?MODULE},
-                               {namespace,  coveralls},
-                               {bare,       true},
-                               {deps,       ?DEPS},
-                               {example,    "rebar3 coveralls send"},
-                               {short_desc, "Send coverdata to coveralls."},
-                               {desc,       "Send coveralls to coveralls."},
-                               {opts,       []}]),
+  Provider = providers:create([ {name,       ?PROVIDER}
+                              , {module,     ?MODULE}
+                              , {namespace,  coveralls}
+                              , {bare,       true}
+                              , {deps,       ?DEPS}
+                              , {example,    "rebar3 coveralls send"}
+                              , {short_desc, "Send coverdata to coveralls."}
+                              , {desc,       "Send coveralls to coveralls."}
+                              , {opts,       []}
+                              ]),
   {ok, rebar_state:add_provider(State, Provider)}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -81,10 +85,11 @@ format_error(Reason) ->
 
 cover_paths(State) ->
   lists:foreach(fun(App) ->
-    AppDir = rebar_app_info:out_dir(App),
-    _ = code:add_path(filename:join([AppDir, "ebin"])),
-    _ = code:add_path(filename:join([AppDir, "test"]))
-  end, rebar_state:project_apps(State)),
+                    AppDir = rebar_app_info:out_dir(App),
+                    true   = code:add_path(filename:join([AppDir, "ebin"])),
+                    true   = code:add_path(filename:join([AppDir, "test"]))
+                end,
+                rebar_state:project_apps(State)),
   _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
   ok.
 

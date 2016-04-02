@@ -2,8 +2,8 @@
 %%% @doc coveralls
 %%% @end
 %%% @author Markus Ekholm <markus@botten.org>
-%%% @copyright 2013-2015 (c) Markus Ekholm <markus@botten.org>
-%%% @license Copyright (c) 2013-2015, Markus Ekholm
+%%% @copyright 2013-2016 (c) Markus Ekholm <markus@botten.org>
+%%% @license Copyright (c) 2013-2016, Markus Ekholm
 %%% All rights reserved.
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions are met:
@@ -63,18 +63,18 @@
 %%=============================================================================
 %% API functions
 
-%% @doc Import and convert cover file `Filename` to a json string
+%% @doc Import and convert cover file(s) `Filenames` to a json string
 %%      representation suitable to post to coveralls.
 %%
 %%      Note that this function will crash if the modules mentioned in
-%%      `Filename` are not availabe on the node.
+%%      any of the `Filenames` are not availabe on the node.
 %% @end
 -spec convert_file(string() | [string()], string(), string()) -> string().
 convert_file(Filenames, ServiceJobId, ServiceName) ->
   convert_file(Filenames, ServiceJobId, ServiceName, #s{}).
 
-%% @doc Import and convert cover file `Filename` to a json string and send the
-%%      json to coveralls
+%% @doc Import and convert cover files `Filenames` to a json string and send the
+%%      json to coveralls.
 %% @end
 -spec convert_and_send_file(string() | [string()], string(), string()) -> ok.
 convert_and_send_file(Filenames, ServiceJobId, ServiceName) ->
@@ -86,7 +86,9 @@ convert_and_send_file(Filenames, ServiceJobId, ServiceName) ->
 convert_file([L|_]=Filename, ServiceJobId, ServiceName, S) when is_integer(L) ->
   convert_file([Filename], ServiceJobId, ServiceName, S);
 convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, S) ->
-  lists:foreach(fun(Filename) -> ok = import(S, Filename) end, Filenames),
+  ok               = lists:foreach(
+                       fun(Filename) -> ok = import(S, Filename) end,
+                       Filenames),
   ConvertedModules = convert_modules(S),
   Str              =
     "{~n"
@@ -184,7 +186,8 @@ convert_module(Mod, S) ->
             "\"coverage\": ~p~n"
             "}",
           Src = escape_str(Src0),
-          lists:flatten(io_lib:format(Str, [relative_to_cwd(SrcFile), Src, Cov]))
+          lists:flatten(
+            io_lib:format(Str, [relative_to_cwd(SrcFile), Src, Cov]))
   end.
 
 expand(Path) -> expand(filename:split(Path), []).
@@ -198,7 +201,7 @@ expand([Segment|Tail], Acc)  -> expand(Tail, [Segment|Acc]).
 realpath(Path) -> realpath(filename:split(Path), "./").
 
 realpath([], Acc)            -> filename:absname(expand(Acc));
-realpath([Head | Tail], Acc) -> 
+realpath([Head | Tail], Acc) ->
   NewAcc0 = filename:join([Acc, Head]),
   NewAcc = case file:read_link(NewAcc0) of
     {ok, Link} ->
@@ -238,7 +241,7 @@ create_cov(CoveredLines, [_|LineNos])                            ->
 
 count_lines("")      -> 1;
 count_lines("\n")    -> 1;
-count_lines([$\n|S]) -> 1+count_lines(S);
+count_lines([$\n|S]) -> 1 + count_lines(S);
 count_lines([_|S])   -> count_lines(S).
 
 escape_str(Str) ->
@@ -252,7 +255,7 @@ escape_str(Str) ->
 join(List, Sep) -> join1([E || E <- List, E /= ""], Sep).
 
 join1([H], _Sep)  -> H;
-join1([H|T], Sep) -> H++Sep++join1(T, Sep).
+join1([H|T], Sep) -> H ++ Sep ++ join1(T, Sep).
 
 replace_char("", _, _)    -> "";
 replace_char([E|S], E, R) -> R ++ replace_char(S, E, R);
@@ -261,6 +264,7 @@ replace_char([C|S], E, R) -> [C | replace_char(S, E, R)].
 %%=============================================================================
 %% Tests
 
+-ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
 convert_file_test() ->
@@ -337,10 +341,10 @@ count_lines_test_() ->
   ].
 
 join_test_() ->
-  [ ?_assertEqual("a,b"   , join(["a","b"], ","))
-  , ?_assertEqual("a,b,c" , join(["a","b","c"], ","))
-  , ?_assertEqual("a,c" , join(["a","","c"], ","))
-  , ?_assertEqual("a,b" , join(["a","b",""], ","))
+  [ ?_assertEqual("a,b"  , join(["a","b"], ","))
+  , ?_assertEqual("a,b,c", join(["a","b","c"], ","))
+  , ?_assertEqual("a,c"  , join(["a","","c"], ","))
+  , ?_assertEqual("a,b"  , join(["a","b",""], ","))
   ].
 
 replce_char_test_() ->
@@ -351,35 +355,82 @@ replce_char_test_() ->
 
 expand_test_() ->
   [ ?_assertEqual("/a/b", expand(["/", "a", "b"], []))
-  , ?_assertEqual("a/c", expand(["a", "b", "..", ".", "c"], []))
-  , ?_assertEqual("/", expand(["..", ".", "/"], []))
+  , ?_assertEqual("a/c" , expand(["a", "b", "..", ".", "c"], []))
+  , ?_assertEqual("/"   , expand(["..", ".", "/"], []))
   ].
 
 realpath_and_relative_test_() ->
-  {ok, Cwd} = file:get_cwd(),
-  Root = string:strip(os:cmd("mktemp -d -t coveralls_tests.XXX"), right, $\n),
-  Filename = "file",
-  Dir1  = filename:join([Root, "_test_src", "dir1"]),
-  Dir2  = filename:join([Root, "_test_src", "dir2"]),
-  File1 = filename:join([Dir1, Filename]),
-  File2 = filename:join([Dir2, Filename]),
-  Link1 = filename:join([Root, "_test_build", "default", "lib", "mylib", "src", "dir1"]),
-  Link2 = filename:join([Root, "_test_build", "default", "lib", "mylib", "src", "dir2"]),
-  [ ?_assertEqual(ok, file:set_cwd(Root))
-  , ?_assertEqual(ok, filelib:ensure_dir(filename:join([Dir1, "dummy"])))
-  , ?_assertEqual(ok, filelib:ensure_dir(filename:join([Dir2, "dummy"])))
-  , ?_assertEqual(ok, file:write_file(File1, "data"))
-  , ?_assertEqual(ok, file:write_file(File2, "data"))
-  , ?_assertEqual(ok, filelib:ensure_dir(Link1))
-  , ?_assertEqual(ok, filelib:ensure_dir(Link2))
-  , ?_assertEqual(ok, file:make_symlink(Dir1, Link1))
-  , ?_assertEqual(ok, file:make_symlink(filename:join(["..", "..", "..", "..", "..", "_test_src", "dir2"]), Link2))
-  , ?_assertEqual(realpath(File1), realpath(filename:join([Link1, Filename])))
-  , ?_assertEqual(realpath(File2), realpath(filename:join([Link2, Filename])))
-  , ?_assertEqual(realpath(File1), filename:absname(relative_to_cwd(filename:join([Link1, Filename]))))
-  , ?_assertEqual(realpath(File2), filename:absname(relative_to_cwd(filename:join([Link2, Filename]))))
-  , ?_assertEqual(ok, file:set_cwd(Cwd))
-  ].
+  {setup,
+   fun() -> %% setup
+       {ok, Cwd} = file:get_cwd(),
+       Root = string:strip(
+                os:cmd("mktemp -d -t coveralls_tests.XXX"), right, $\n),
+       ok = file:set_cwd(Root),
+       {Cwd, Root}
+   end,
+   fun({Cwd, _Root}) -> %% teardown
+       ok = file:set_cwd(Cwd)
+   end,
+   fun({_Cwd, Root}) -> %% tests
+     Filename = "file",
+     Dir1  = filename:join([Root, "_test_src", "dir1"]),
+     Dir2  = filename:join([Root, "_test_src", "dir2"]),
+     File1 = filename:join([Dir1, Filename]),
+     File2 = filename:join([Dir2, Filename]),
+     Link1 = filename:join([ Root
+                           , "_test_build"
+                           , "default"
+                           , "lib"
+                           , "mylib"
+                           , "src"
+                           , "dir1"
+                           ]),
+     Link2 = filename:join([ Root
+                           , "_test_build"
+                           , "default"
+                           , "lib"
+                           , "mylib"
+                           , "src"
+                           , "dir2"
+                           ]),
+     [ ?_assertEqual(ok,
+                     filelib:ensure_dir(filename:join([Dir1, "dummy"])))
+     , ?_assertEqual(ok,
+                     filelib:ensure_dir(filename:join([Dir2, "dummy"])))
+     , ?_assertEqual(ok,
+                     file:write_file(File1, "data"))
+     , ?_assertEqual(ok,
+                     file:write_file(File2, "data"))
+     , ?_assertEqual(ok,
+                     filelib:ensure_dir(Link1))
+     , ?_assertEqual(ok,
+                     filelib:ensure_dir(Link2))
+     , ?_assertEqual(ok,
+                     file:make_symlink(Dir1, Link1))
+     , ?_assertEqual(ok,
+                     file:make_symlink(filename:join([ ".."
+                                                     , ".."
+                                                     , ".."
+                                                     , ".."
+                                                     , ".."
+                                                     , "_test_src"
+                                                     , "dir2"
+                                                     ])
+                                      , Link2))
+     , ?_assertEqual(realpath(File1),
+                     realpath(filename:join([Link1, Filename])))
+     , ?_assertEqual(realpath(File2),
+                     realpath(filename:join([Link2, Filename])))
+     , ?_assertEqual(realpath(File1),
+                     filename:absname(
+                       relative_to_cwd(
+                         filename:join([Link1, Filename]))))
+     , ?_assertEqual(realpath(File2),
+                     filename:absname(
+                       relative_to_cwd(
+                         filename:join([Link2, Filename]))))
+     ]
+   end}.
 
 %%-----------------------------------------------------------------------------
 %% Callback mockery tests
@@ -464,6 +515,8 @@ mock_s(Json) ->
             end
         end
     }.
+
+-endif.
 
 %%% Local Variables:
 %%% allout-layout: t
