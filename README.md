@@ -30,7 +30,7 @@ You will also need to add the following lines to your `rebar.config`:
 {plugin_dir             , "deps/coveralls/src"}.
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
-{coveralls_coverdata    , ".eunit/eunit.coverdata"}.
+{coveralls_coverdata    , ".eunit/eunit.coverdata"}. % or a list of files
 {coveralls_service_name , "travis-ci"}.
 ```
 These changes will add `coveralls-erl` as a dependency, tell `rebar` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `travis-ci`. 
@@ -65,7 +65,7 @@ Example `rebar.config`:
 {plugins                , [{coveralls, {git, "https://github.com/markusn/coveralls-erl", "master"}}]}.
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
-{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}.
+{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a list of files
 {coveralls_service_name , "travis-ci"}.
 ```
 

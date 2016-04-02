@@ -69,22 +69,24 @@
 %%      Note that this function will crash if the modules mentioned in
 %%      `Filename` are not availabe on the node.
 %% @end
--spec convert_file(string(), string(), string()) -> string().
-convert_file(Filename, ServiceJobId, ServiceName) ->
-  convert_file(Filename, ServiceJobId, ServiceName, #s{}).
+-spec convert_file(string() | [string()], string(), string()) -> string().
+convert_file(Filenames, ServiceJobId, ServiceName) ->
+  convert_file(Filenames, ServiceJobId, ServiceName, #s{}).
 
 %% @doc Import and convert cover file `Filename` to a json string and send the
 %%      json to coveralls
 %% @end
--spec convert_and_send_file(string(), string(), string()) -> ok.
-convert_and_send_file(Filename, ServiceJobId, ServiceName) ->
-  convert_and_send_file(Filename, ServiceJobId, ServiceName, #s{}).
+-spec convert_and_send_file(string() | [string()], string(), string()) -> ok.
+convert_and_send_file(Filenames, ServiceJobId, ServiceName) ->
+  convert_and_send_file(Filenames, ServiceJobId, ServiceName, #s{}).
 
 %%=============================================================================
 %% Internal functions
 
-convert_file(Filename, ServiceJobId, ServiceName, S) ->
-  ok               = import(S, Filename),
+convert_file([L|_]=Filename, ServiceJobId, ServiceName, S) when is_integer(L) ->
+  convert_file([Filename], ServiceJobId, ServiceName, S);
+convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, S) ->
+  lists:foreach(fun(Filename) -> ok = import(S, Filename) end, Filenames),
   ConvertedModules = convert_modules(S),
   Str              =
     "{~n"
@@ -95,8 +97,8 @@ convert_file(Filename, ServiceJobId, ServiceName, S) ->
   lists:flatten(
     io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
 
-convert_and_send_file(Filename, ServiceJobId, ServiceName, S) ->
-  send(convert_file(Filename, ServiceJobId, ServiceName, S), S).
+convert_and_send_file(Filenames, ServiceJobId, ServiceName, S) ->
+  send(convert_file(Filenames, ServiceJobId, ServiceName, S), S).
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
