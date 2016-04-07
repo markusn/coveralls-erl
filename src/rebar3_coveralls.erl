@@ -87,7 +87,7 @@ cover_paths(State) ->
   lists:foreach(fun(App) ->
                     AppDir = rebar_app_info:out_dir(App),
                     true   = code:add_path(filename:join([AppDir, "ebin"])),
-                    true   = code:add_path(filename:join([AppDir, "test"]))
+                    _      = code:add_path(filename:join([AppDir, "test"]))
                 end,
                 rebar_state:project_apps(State)),
   _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
