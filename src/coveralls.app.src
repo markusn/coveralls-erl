@@ -6,5 +6,7 @@
  , {registred, []}
  , {applications,[kernel, stdlib]}
  , {env, [{providers, [rebar3_coveralls]}]}
+ , {maintainers, ["Markus Ekholm"]}
+ , {links, [{"Github", "https://github.com/markusn/coveralls-erl"}]}
  ]
 }.
