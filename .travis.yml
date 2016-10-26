@@ -7,6 +7,7 @@ install: "true"
 language: erlang
 sudo: false
 otp_release:
+  - 18.2.1
   - 18.0
   - R16B
 env:
