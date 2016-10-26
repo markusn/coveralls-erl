@@ -104,7 +104,7 @@ convert_and_send_file(Filenames, ServiceJobId, ServiceName, S) ->
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
-  Boundary = "----------" ++ integer_to_list(random:uniform(1000)),
+  Boundary = "----------" ++ integer_to_list(rand:uniform(1000)),
   Type     = "multipart/form-data; boundary=" ++ Boundary,
   Body     = to_body(Json, Boundary),
   R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
