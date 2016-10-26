@@ -9,7 +9,6 @@ sudo: false
 otp_release:
   - 18.2.1
   - 18.0
-  - R16B
 env:
   - REBAR3=false
   - REBAR3=true
