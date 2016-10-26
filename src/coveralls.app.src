@@ -1,6 +1,7 @@
 {application, coveralls,
  [ {description, "Coveralls for Erlang"}
  , {vsn, git}
+ , {licenses, ["BSD"]}
  , {modules, []}
  , {registred, []}
  , {applications,[kernel, stdlib]}
