@@ -86,11 +86,11 @@ format_error(Reason) ->
 cover_paths(State) ->
   lists:foreach(fun(App) ->
                     AppDir = rebar_app_info:out_dir(App),
-                    true   = code:add_path(filename:join([AppDir, "ebin"])),
-                    _      = code:add_path(filename:join([AppDir, "test"]))
+                    true   = code:add_patha(filename:join([AppDir, "ebin"])),
+                    _      = code:add_patha(filename:join([AppDir, "test"]))
                 end,
                 rebar_state:project_apps(State)),
-  _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
+  _ = code:add_patha(filename:join([rebar_dir:base_dir(State), "test"])),
   ok.
 
 %%% Local Variables:
