@@ -90,8 +90,15 @@ convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, S) ->
                        fun(Filename) -> ok = import(S, Filename) end,
                        Filenames),
   ConvertedModules = convert_modules(S),
+
+  RepoToken =
+        case os:getenv("COVERALLS_REPO_TOKEN") of
+            false -> "";
+            Token -> "\"repo_token\": \"" ++ Token ++ "\",~n"
+        end,
+
   Str              =
-    "{~n"
+    "{~n" ++ RepoToken ++
     "\"service_job_id\": \"~s\",~n"
     "\"service_name\": \"~s\",~n"
     "\"source_files\": ~s"
