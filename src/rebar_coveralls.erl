@@ -60,7 +60,7 @@ eunit(Conf, _) ->
 %% Internal functions
 
 coveralls(Conf, Task) ->
-  ConvertAndSend = fun coveralls:convert_and_send_file/3,
+  ConvertAndSend = fun coveralls:convert_and_send_file/4,
   Get            = fun(Key, Def) -> rebar_config:get(Conf, Key, Def) end,
   GetLocal       = fun(Key, Def) -> rebar_config:get_local(Conf, Key, Def) end,
   MaybeSkip      = fun() -> ok end,
@@ -71,6 +71,7 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   File         = GetLocal(coveralls_coverdata, undef),
   ServiceName  = GetLocal(coveralls_service_name, undef),
   ServiceJobId = GetLocal(coveralls_service_job_id, undef),
+  RepoToken    = GetLocal(coveralls_repo_token, []),
   F            = fun(X) -> X =:= undef orelse X =:= false end,
   CoverExport  = Get(cover_export_enabled, false),
   case lists:any(F, [File, ServiceName, ServiceJobId, CoverExport]) of
@@ -90,7 +91,7 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
                     "Exporting cover data "
                     "from ~s using service ~s and jobid ~s~n",
                     [File, ServiceName, ServiceJobId]),
-          ok = ConvertAndSend(File, ServiceJobId, ServiceName);
+          ok = ConvertAndSend(File, ServiceJobId, ServiceName, RepoToken);
         _ -> MaybeSkip()
       end
   end.
@@ -106,20 +107,22 @@ task_test_() ->
   File           = "foo",
   ServiceJobId   = "123",
   ServiceName    = "bar",
-  ConvertAndSend = fun("foo", "123", "bar") -> ok end,
+  ConvertAndSend = fun("foo", "123", "bar", "") -> ok end,
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;
                       (coveralls_service_job_id, _) -> ServiceJobId;
                       (do_coveralls_after_eunit, _) -> true;
-                      (do_coveralls_after_ct, _)    -> true
+                      (do_coveralls_after_ct, _)    -> true;
+                      (coveralls_repo_token, _)     -> []
                    end,
   GetLocalWithCoverallsTask
                  = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;
                       (coveralls_service_job_id, _) -> ServiceJobId;
                       (do_coveralls_after_eunit, _) -> false;
-                      (do_coveralls_after_ct, _)    -> false
+                      (do_coveralls_after_ct, _)    -> false;
+                      (coveralls_repo_token, _)     -> []
                    end,
   GetBroken     = fun(cover_export_enabled, _) -> false end,
   MaybeSkip     = fun() -> skip end,

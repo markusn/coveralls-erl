@@ -38,8 +38,8 @@
 %%=============================================================================
 %% Exports
 
--export([ convert_file/3
-        , convert_and_send_file/3
+-export([ convert_file/4
+        , convert_and_send_file/4
         ]).
 
 %%=============================================================================
@@ -69,33 +69,29 @@
 %%      Note that this function will crash if the modules mentioned in
 %%      any of the `Filenames` are not availabe on the node.
 %% @end
--spec convert_file(string() | [string()], string(), string()) -> string().
-convert_file(Filenames, ServiceJobId, ServiceName) ->
-  convert_file(Filenames, ServiceJobId, ServiceName, #s{}).
+-spec convert_file(string() | [string()], string(), string(), string()) ->
+                          string().
+convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
+  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
 
 %% @doc Import and convert cover files `Filenames` to a json string and send the
 %%      json to coveralls.
 %% @end
--spec convert_and_send_file(string() | [string()], string(), string()) -> ok.
-convert_and_send_file(Filenames, ServiceJobId, ServiceName) ->
-  convert_and_send_file(Filenames, ServiceJobId, ServiceName, #s{}).
+-spec convert_and_send_file(string() | [string()], string(), string(),
+                            string()) -> ok.
+convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
+  convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
 
 %%=============================================================================
 %% Internal functions
 
-convert_file([L|_]=Filename, ServiceJobId, ServiceName, S) when is_integer(L) ->
-  convert_file([Filename], ServiceJobId, ServiceName, S);
-convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, S) ->
+convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
+  convert_file([Filename], ServiceJobId, ServiceName, RepoToken, S);
+convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
   ok               = lists:foreach(
                        fun(Filename) -> ok = import(S, Filename) end,
                        Filenames),
   ConvertedModules = convert_modules(S),
-
-  RepoToken =
-        case os:getenv("COVERALLS_REPO_TOKEN") of
-            false -> "";
-            Token -> "\"repo_token\": \"" ++ Token ++ "\",~n"
-        end,
 
   Str              =
     "{~n" ++ RepoToken ++
@@ -106,8 +102,8 @@ convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, S) ->
   lists:flatten(
     io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
 
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, S) ->
-  send(convert_file(Filenames, ServiceJobId, ServiceName, S), S).
+convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
+  send(convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S), S).
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
@@ -295,6 +291,7 @@ convert_file_test() ->
   ?assertEqual(Expected, convert_file("example.rb",
                                       "1234567890",
                                       "travis-ci",
+                                      "",
                                       mock_s())).
 
 convert_and_send_file_test() ->
@@ -318,6 +315,7 @@ convert_and_send_file_test() ->
   ?assertEqual(ok, convert_and_send_file("example.rb",
                                          "1234567890",
                                          "travis-ci",
+                                         "",
                                          mock_s(Expected))).
 
 send_test_() ->
