@@ -61,7 +61,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
   rebar_api:info("Running coveralls...", []),
-  ConvertAndSend = fun coveralls:convert_and_send_file/3,
+  ConvertAndSend = fun coveralls:convert_and_send_file/4,
   Get            = fun(Key, Def) -> rebar_state:get(State, Key, Def) end,
   GetLocal       = fun(Key, Def) -> rebar_state:get(State, Key, Def) end,
   MaybeSkip      = fun() -> ok end,
