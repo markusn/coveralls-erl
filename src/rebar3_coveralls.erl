@@ -1,9 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% @doc coveralls plugin for rebar3
-%%% @end
-%%% @author Yury Gargay <yury.gargay@gmail.com>
-%%% @copyright 2013-2015 (c) Markus Ekholm <markus@botten.org>
-%%% @license Copyright (c) 2013-2015, Markus Ekholm
+%%% Copyright (c) 2013-2016, Markus Ekholm
 %%% All rights reserved.
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions are met:
@@ -27,7 +23,12 @@
 %%% (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 %%% THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%%
+%%% @copyright 2013-2016 (c) Yury Gargay <yury.gargay@gmail.com>,
+%%% Markus Ekholm <markus@botten.org>
 %%% @end
+%%% @author Yury Gargay <yury.gargay@gmail.com>
+%%% @author Markus Ekholm <markus@botten.org>
+%%% @doc coveralls plugin for rebar3
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -module(rebar3_coveralls).

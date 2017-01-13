@@ -14,6 +14,6 @@ env:
   - REBAR3=true
 script: 
     - case "$REBAR3" in
-        false) ./rebar compile && ./rebar skip_deps=true eunit;;
-        true) ./rebar3 eunit skip_deps=true;;
+        false) ./rebar compile && ./rebar skip_deps=true edoc && ./rebar skip_deps=true eunit;;
+        true) ./rebar3 eunit edoc skip_deps=true;;
       esac

@@ -1,9 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% @doc coveralls
-%%% @end
-%%% @author Markus Ekholm <markus@botten.org>
-%%% @copyright 2013-2016 (c) Markus Ekholm <markus@botten.org>
-%%% @license Copyright (c) 2013-2016, Markus Ekholm
+%%% Copyright (c) 2013-2016, Markus Ekholm
 %%% All rights reserved.
 %%% Redistribution and use in source and binary forms, with or without
 %%% modification, are permitted provided that the following conditions are met:
@@ -27,7 +23,9 @@
 %%% (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 %%% THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %%%
-%%% @end
+%%% @copyright 2013-2016 (c) Markus Ekholm <markus@botten.org>
+%%% @author Markus Ekholm <markus@botten.org>
+%%% @doc coveralls
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%=============================================================================
@@ -63,18 +61,18 @@
 %%=============================================================================
 %% API functions
 
-%% @doc Import and convert cover file(s) `Filenames` to a json string
+%% @doc Import and convert cover file(s) `Filenames' to a json string
 %%      representation suitable to post to coveralls.
 %%
 %%      Note that this function will crash if the modules mentioned in
-%%      any of the `Filenames` are not availabe on the node.
+%%      any of the `Filenames' are not availabe on the node.
 %% @end
 -spec convert_file(string() | [string()], string(), string(), string()) ->
                           string().
 convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
   convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
 
-%% @doc Import and convert cover files `Filenames` to a json string and send the
+%% @doc Import and convert cover files `Filenames' to a json string and send the
 %%      json to coveralls.
 %% @end
 -spec convert_and_send_file(string() | [string()], string(), string(),
