@@ -87,11 +87,16 @@ convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
 
 convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
   convert_file([Filename], ServiceJobId, ServiceName, RepoToken, S);
-convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
+convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken0, S) ->
   ok               = lists:foreach(
                        fun(Filename) -> ok = import(S, Filename) end,
                        Filenames),
   ConvertedModules = convert_modules(S),
+
+  RepoToken = case RepoToken0 of
+                  "" -> "";
+                  _ -> "\"repo_token\": \"" ++ RepoToken0 ++ "\",~n"
+              end,
 
   Str              =
     "{~n" ++ RepoToken ++
