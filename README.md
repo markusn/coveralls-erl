@@ -23,7 +23,7 @@ This will ensure that the rebar coveralls plugin will have access to the needed 
 
 You will also need to add the following lines to your `rebar.config`:
 ```erlang                                                                                                       
-{plugins                , [{coveralls, {git, "https://github.com/markusn/coveralls-erl", "master"}}]}.
+{plugins                , [coveralls]}. % use hex package
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
 {coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a list of files
@@ -53,7 +53,7 @@ Example `rebar.config`:
 
 ```erlang
 
-{plugins                , [coveralls]}. % use hexc package
+{plugins                , [coveralls]}. % use hex package
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
 {coveralls_coverdata    , "_build/test/cover/ct.coverdata"}.
