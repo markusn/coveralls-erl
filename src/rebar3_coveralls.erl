@@ -55,7 +55,8 @@ init(State) ->
                               , {example,    "rebar3 coveralls send"}
                               , {short_desc, "Send coverdata to coveralls."}
                               , {desc,       "Send coveralls to coveralls."}
-                              , {opts,       []}
+                              , {profiles,   [test]}
+															, {opts,       []}
                               ]),
   {ok, rebar_state:add_provider(State, Provider)}.
 
