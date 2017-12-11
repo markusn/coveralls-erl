@@ -7,13 +7,14 @@ install: "true"
 language: erlang
 sudo: false
 otp_release:
+  - 20.0
   - 19.0
   - 18.2.1
   - 18.0
 env:
   - REBAR3=false
   - REBAR3=true
-script: 
+script:
     - case "$REBAR3" in
         false) ./rebar compile && ./rebar skip_deps=true doc && ./rebar skip_deps=true eunit;;
         true) ./rebar3 eunit edoc skip_deps=true;;
