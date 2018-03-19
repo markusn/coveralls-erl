@@ -10,6 +10,7 @@ otp_release:
   - 19.0
   - 18.2.1
   - 18.0
+  - 17.4
 env:
   - REBAR3=false
   - REBAR3=true
