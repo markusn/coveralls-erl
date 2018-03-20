@@ -58,10 +58,10 @@
 -define(COVERALLS_URL, "https://coveralls.io/api/v1/jobs").
 %%-define(COVERALLS_URL, "http://127.0.0.1:8080").
 
--ifdef(rand_only).
--define(random, rand).
--else.
+-ifdef(random_only).
 -define(random, random).
+-else.
+-define(random, rand).
 -endif.
 
 %%=============================================================================
