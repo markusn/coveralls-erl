@@ -58,6 +58,12 @@
 -define(COVERALLS_URL, "https://coveralls.io/api/v1/jobs").
 %%-define(COVERALLS_URL, "http://127.0.0.1:8080").
 
+-ifdef(random_only).
+-define(random, random).
+-else.
+-define(random, rand).
+-endif.
+
 %%=============================================================================
 %% API functions
 
@@ -110,7 +116,7 @@ convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
-  Boundary = "----------" ++ integer_to_list(rand:uniform(1000)),
+  Boundary = "----------" ++ integer_to_list(?random:uniform(1000)),
   Type     = "multipart/form-data; boundary=" ++ Boundary,
   Body     = to_body(Json, Boundary),
   R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
