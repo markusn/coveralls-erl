@@ -4,11 +4,11 @@ coveralls-erl
 [![Coverage Status](https://coveralls.io/repos/markusn/coveralls-erl/badge.png?branch=master)](https://coveralls.io/r/markusn/coveralls-erl?branch=master)
 [![Hex.pm](https://img.shields.io/hexpm/v/coveralls.svg?style=flat)](https://hex.pm/packages/coveralls)
 
-Erlang module to convert and send cover data to coveralls. Available as a hex package on https://hex.pm/packages/coveralls. 
+Erlang module to convert and send cover data to coveralls. Available as a hex package on https://hex.pm/packages/coveralls.
 
-## Example usage: rebar3 and Travis CI      
+## Example usage: rebar3 and Travis CI
 In order to use coveralls-erl + Travis CI in your project you will need to add the following lines to your
-`rebar.config.script`:                                                                                      
+`rebar.config.script`:
 
 ```erlang
 case os:getenv("TRAVIS") of
@@ -23,7 +23,7 @@ end.
 This will ensure that the rebar coveralls plugin will have access to the needed JobId and that the plugin is only run from Travis CI.
 
 You will also need to add the following lines to your `rebar.config`:
-```erlang                                                                                                       
+```erlang
 {plugins                , [coveralls]}. % use hex package
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
@@ -39,7 +39,7 @@ And you send the coverdata to coveralls by issuing: `rebar3 coveralls send`
 If you have dependencies specific to the test profile, or if you only add the coveralls dependency or any of its' configuration variables to the test profile you need to run coveralls using: `rebar3 as test coveralls send`
 
 ## Example: rebar3 and CircleCI
-Example `rebar.config.script`:                                                                                      
+Example `rebar.config.script`:
 
 ```erlang
 case {os:getenv("CIRCLECI"), os:getenv("COVERALLS_REPO_TOKEN")} of
@@ -66,8 +66,9 @@ Example `rebar.config`:
 Note that you'll need to set `COVERALLS_REPO_TOKEN` in your CircleCI environment variables!
 
 ## Example usage: rebar and Travis CI
-Example `rebar.config.script`:      
-                                                                                                 
+
+Example `rebar.config.script`:
+
 ```erlang
 case os:getenv("TRAVIS") of
   "true" ->
@@ -78,8 +79,10 @@ case os:getenv("TRAVIS") of
     CONFIG
 end.
 ```
+
 Example `rebar.config`:
-```erlang                                                                                                       
+
+```erlang
 {deps                   , [ { coveralls
                             , ".*"
                             , {git, "git://github.com/markusn/coveralls-erl.git", "master"}
@@ -104,4 +107,3 @@ Markus Ekholm (markus at botten dot org).
 
 ## License
 3-clause BSD. For details see `COPYING`.
-
