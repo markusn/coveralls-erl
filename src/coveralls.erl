@@ -36,7 +36,9 @@
 %%=============================================================================
 %% Exports
 
--export([ convert_file/4
+-export([ convert_file/2
+        , convert_file/4
+        , convert_and_send_file/2
         , convert_and_send_file/4
         ]).
 
@@ -70,7 +72,15 @@
 -spec convert_file(string() | [string()], string(), string(), string()) ->
                           string().
 convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+  Parameters =
+    [ {repo_token, RepoToken}
+    , {service_name, ServiceName}
+    , {service_job_id, ServiceJobId}
+    ],
+  convert_file(Filenames, Parameters).
+
+convert_file(Filenames, Parameters) ->
+  convert_file(Filenames, Parameters, #s{}).
 
 %% @doc Import and convert cover files `Filenames' to a json string and send the
 %%      json to coveralls.
@@ -78,35 +88,59 @@ convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
 -spec convert_and_send_file(string() | [string()], string(), string(),
                             string()) -> ok.
 convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+  Parameters =
+    [ {repo_token, RepoToken}
+    , {service_name, ServiceName}
+    , {service_job_id, ServiceJobId}
+    ],
+  convert_and_send_file(Filenames, Parameters).
+
+convert_and_send_file(Filenames, Parameters) ->
+  convert_and_send_file(Filenames, Parameters, #s{}).
 
 %%=============================================================================
 %% Internal functions
 
-convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
-  convert_file([Filename], ServiceJobId, ServiceName, RepoToken, S);
-convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken0, S) ->
-  ok               = lists:foreach(
-                       fun(Filename) -> ok = import(S, Filename) end,
-                       Filenames),
+convert_file([L|_]=Filename, Parameters, S) when is_integer(L) ->
+  convert_file([Filename], Parameters, S);
+convert_file([[_|_]|_]=Filenames, Parameters, S) ->
+  %% Extract parameters
+  RepoToken = add_field_if_existing(repo_token, Parameters),
+  Parallel = add_field_if_existing(parallel, Parameters),
+  ServiceNumber = add_field_if_existing(service_number, Parameters),
+  ServiceName = add_field_if_existing(service_name, Parameters),
+  ServiceJobId = add_field_if_existing(service_job_id, Parameters),
+  %% Import modules
+  ok = lists:foreach(fun(Filename) -> ok = import(S, Filename) end, Filenames),
+  %% Convert modules
   ConvertedModules = convert_modules(S),
-
-  RepoToken = case RepoToken0 of
-                  "" -> "";
-                  _ -> "\"repo_token\": \"" ++ RepoToken0 ++ "\",~n"
-              end,
-
-  Str              =
-    "{~n" ++ RepoToken ++
-    "\"service_job_id\": \"~s\",~n"
-    "\"service_name\": \"~s\",~n"
+  %% Generate JSON
+  Str =
+    "{~n" ++
+    RepoToken ++
+    Parallel ++
+    ServiceNumber ++
+    ServiceJobId ++
+    ServiceName ++
     "\"source_files\": ~s"
     "}",
   lists:flatten(
-    io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
+    io_lib:format(Str, [ConvertedModules])).
 
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
-  send(convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S), S).
+add_field_if_existing(Field, Parameters) ->
+  case proplists:get_value(Field, Parameters, "") of
+    "" -> "";
+    Value ->
+      SValue =
+        case is_list(Value) of
+          true -> io_lib:format("\"~s\"", [Value]);
+          false -> io_lib:format("~w",[Value])
+        end,
+      io_lib:format("\"~w\": ~s,~n", [Field, SValue])
+  end.
+
+convert_and_send_file(Filenames, Parameters, S) ->
+  send(convert_file(Filenames, Parameters, S), S).
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
