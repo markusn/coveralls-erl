@@ -217,17 +217,17 @@ convert_module(Mod, S) ->
     SrcFile ->
           {ok, SrcBin} = read_file(S, SrcFile),
           Src0         = lists:flatten(io_lib:format("~s", [SrcBin])),
+          SrcDigest    = binary:decode_unsigned(erlang:md5(SrcBin)),
           LinesCount   = count_lines(Src0),
           Cov          = create_cov(CoveredLines, LinesCount),
           Str          =
             "{~n"
             "\"name\": \"~s\",~n"
-            "\"source\": \"~s\",~n"
+            "\"source_digest\": \"~.16b\",~n"
             "\"coverage\": ~p~n"
             "}",
-          Src = escape_str(Src0),
           lists:flatten(
-            io_lib:format(Str, [relative_to_cwd(SrcFile), Src, Cov]))
+            io_lib:format(Str, [relative_to_cwd(SrcFile), SrcDigest, Cov]))
   end.
 
 expand(Path) -> expand(filename:split(Path), []).
@@ -284,22 +284,10 @@ count_lines("\n")    -> 1;
 count_lines([$\n|S]) -> 1 + count_lines(S);
 count_lines([_|S])   -> count_lines(S).
 
-escape_str(Str) ->
-  Funs = [ fun(S) -> replace_char(S, $\\, "\\\\") end
-         , fun(S) -> replace_char(S, $\n, "\\n") end
-         , fun(S) -> replace_char(S, $\t, "\\t") end
-         , fun(S) -> replace_char(S, $", "\\\"") end
-         ],
-  lists:foldl(fun(F, S) -> F(S) end, Str, Funs).
-
 join(List, Sep) -> join1([E || E <- List, E /= ""], Sep).
 
 join1([H], _Sep)  -> H;
 join1([H|T], Sep) -> H ++ Sep ++ join1(T, Sep).
-
-replace_char("", _, _)    -> "";
-replace_char([E|S], E, R) -> R ++ replace_char(S, E, R);
-replace_char([C|S], E, R) -> [C | replace_char(S, E, R)].
 
 %%=============================================================================
 %% Tests
