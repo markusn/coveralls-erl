@@ -47,6 +47,7 @@
            , module_lister = fun cover:imported_modules/0
            , mod_info      = fun module_info_compile/1
            , file_reader   = fun file:read_file/1
+           , wildcard_reader = fun filelib:wildcard/1
            , analyser      = fun cover:analyse/3
            , poster        = fun httpc:request/4
            , poster_init   = start_wrapper([fun ssl:start/0, fun inets:start/0])
@@ -90,7 +91,10 @@ convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
 %% Internal functions
 
 convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
-  convert_file([Filename], ServiceJobId, ServiceName, RepoToken, S);
+  %% single file or wildcard was specified
+  WildcardReader = S#s.wildcard_reader,
+  Filenames = WildcardReader(Filename),
+  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S);
 convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken0, S) ->
   ok               = lists:foreach(
                        fun(Filename) -> ok = import(S, Filename) end,
@@ -512,6 +516,7 @@ mock_s(Json) ->
            ("two.rb")     ->
             {ok, <<"def seven\n  eight\n  nine\nend">>}
         end
+    , wildcard_reader = fun(AnyFile) -> [AnyFile] end
     , analyser      =
         fun('example.rb' , calls, line) -> {ok, [ {{'example.rb', 2}, 1} ]};
            ('two.rb'     , calls, line) -> {ok, [ {{'two.rb', 2}, 1}
