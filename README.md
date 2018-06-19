@@ -27,7 +27,7 @@ You will also need to add the following lines to your `rebar.config`:
 {plugins                , [coveralls]}. % use hex package
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
-{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a list of files
+{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a string with wildcards or a list of files
 {coveralls_service_name , "travis-ci"}.
 ```
 
