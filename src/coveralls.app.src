@@ -1,6 +1,6 @@
 {application, coveralls,
  [ {description, "Coveralls for Erlang"}
- , {vsn, "1.5.0"}
+ , {vsn, git}
  , {licenses, ["BSD"]}
  , {modules, []}
  , {registred, []}
