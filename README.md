@@ -28,8 +28,9 @@ You will also need to add the following lines to your `rebar.config`:
 {cover_enabled          , true}.
 {cover_export_enabled   , true}.
 {coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a string with wildcards or a list of files
-{coveralls_service_name , "travis-ci"}.
+{coveralls_service_name , "travis-ci"}. % use "travis-pro" when using with travis-ci.com
 ```
+When using with travis-ci.com coveralls repo token also has to be added as `{coveralls_repo_token, "token_goes_here"}`
 
 These changes will add `coveralls-erl` as a dependency, tell `rebar3` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `travis-ci`.
 
