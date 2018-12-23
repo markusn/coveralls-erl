@@ -15,8 +15,8 @@ otp_release:
 env:
   - REBAR3=false
   - REBAR3=true
-script: 
+script:
     - case "$REBAR3" in
         false) ./rebar compile && ./rebar skip_deps=true doc && ./rebar skip_deps=true eunit;;
-        true) ./rebar3 do eunit,edoc;;
+        true) DEBUG=1 ./rebar3 do eunit,edoc;;
       esac
