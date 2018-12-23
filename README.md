@@ -34,7 +34,7 @@ When using with travis-ci.com coveralls repo token also has to be added as `{cov
 
 These changes will add `coveralls-erl` as a dependency, tell `rebar3` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `travis-ci`.
 
-And you send the coverdata to coveralls by issuing: `rebar3 coveralls send`
+And you send the coverdata to coveralls by issuing: `rebar3 as test coveralls send`
 
 **Note:**
 If you have dependencies specific to the test profile, or if you only add the coveralls dependency or any of its' configuration variables to the test profile you need to run coveralls using: `rebar3 as test coveralls send`

@@ -10,4 +10,5 @@ otp_release:
   - 19.0
   - 18.0
 script:
-  ./rebar3 do eunit,edoc
+  - ./rebar3 do eunit,edoc
+  - ./rebar3 as test coveralls send
