@@ -66,43 +66,6 @@ Example `rebar.config`:
 
 Note that you'll need to set `COVERALLS_REPO_TOKEN` in your CircleCI environment variables!
 
-## Example usage: rebar and Travis CI
-
-Example `rebar.config.script`:
-
-```erlang
-case os:getenv("TRAVIS") of
-  "true" ->
-    JobId   = os:getenv("TRAVIS_JOB_ID"),
-    CONFIG1 = lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId}),
-    lists:keystore(plugins, 1, CONFIG1, {plugins, [rebar_coveralls]});
-  _ ->
-    CONFIG
-end.
-```
-
-Example `rebar.config`:
-
-```erlang
-{deps                   , [ { coveralls
-                            , ".*"
-                            , {git, "git://github.com/markusn/coveralls-erl.git", "master"}
-                            }
-                          ]}.
-{plugin_dir             , "deps/coveralls/src"}.
-{cover_enabled          , true}.
-{cover_export_enabled   , true}.
-{coveralls_coverdata    , ".eunit/eunit.coverdata"}. % or a list of files
-{coveralls_service_name , "travis-ci"}.
-```
-
-If you don't want to export data to coveralls after EUnit or CT is finished you can disable it for each task:
-```erlang
-{do_coveralls_after_ct, false}.
-{do_coveralls_after_eunit, false}.
-```
-and then use the `send-coveralls` task: `rebar skip_deps=true eunit ct send-coveralls`
-
 ## Author
 Markus Ekholm (markus at botten dot org).
 
