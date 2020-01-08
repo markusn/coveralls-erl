@@ -125,10 +125,12 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   Report0 =
     #{service_job_id => ServiceJobId,
       service_name   => ServiceName},
-  Opts = [{coveralls_repo_token, string}],
+  Opts = [{coveralls_repo_token,           repo_token,           string},
+          {coveralls_service_pull_request, service_pull_request, string},
+          {coveralls_parallel,             parallel,             boolean}],
   Report =
-    lists:foldl(fun({Key, Conv}, R) ->
-                    case GetLocal(Key, undef) of
+    lists:foldl(fun({Cfg, Key, Conv}, R) ->
+                    case GetLocal(Cfg, undef) of
                       undef -> R;
                       Value when Conv =:= string  -> maps:put(Key, to_binary(Value), R);
                       Value when Conv =:= boolean -> maps:put(Key, to_boolean(Value), R);
@@ -162,13 +164,29 @@ task_test_() ->
   ServiceName    = "bar",
   ConvertAndSend = fun("foo", #{service_job_id := <<"123">>,
                                 service_name := <<"bar">>}) -> ok end,
+  ConvertWithOpts = fun("foo", #{service_job_id       := <<"123">>,
+                                 service_name         := <<"bar">>,
+                                 service_pull_request := <<"PR#1">>,
+                                 parallel             := true}) -> ok
+                    end,
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;
                       (coveralls_service_job_id, _) -> ServiceJobId;
                       (do_coveralls_after_eunit, _) -> true;
                       (do_coveralls_after_ct, _)    -> true;
-                      (coveralls_repo_token, _)     -> []
+                      (coveralls_repo_token, _)     -> [];
+                      (_, Default)                  -> Default
+                   end,
+  GetLocalAllOpt = fun(coveralls_coverdata, _)      -> File;
+                      (coveralls_service_name, _)   -> ServiceName;
+                      (coveralls_service_job_id, _) -> ServiceJobId;
+                      (coveralls_service_pull_request, _) -> "PR#1";
+                      (coveralls_parallel, _)       -> true;
+                      (do_coveralls_after_eunit, _) -> true;
+                      (do_coveralls_after_ct, _)    -> true;
+                      (coveralls_repo_token, _)     -> [];
+                      (_, Default)                  -> Default
                    end,
   GetLocalWithCoverallsTask
                  = fun(coveralls_coverdata, _)      -> File;
@@ -176,7 +194,8 @@ task_test_() ->
                       (coveralls_service_job_id, _) -> ServiceJobId;
                       (do_coveralls_after_eunit, _) -> false;
                       (do_coveralls_after_ct, _)    -> false;
-                      (coveralls_repo_token, _)     -> []
+                      (coveralls_repo_token, _)     -> [];
+                      (_, Default)                  -> Default
                    end,
   GetBroken     = fun(cover_export_enabled, _) -> false end,
   MaybeSkip     = fun() -> skip end,
@@ -187,6 +206,8 @@ task_test_() ->
   , ?_assertEqual(skip, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, eunit))
   , ?_assertEqual(skip, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, ct))
   , ?_assertEqual(ok, do_coveralls(ConvertAndSend, Get, GetLocalWithCoverallsTask, MaybeSkip, 'send-coveralls'))
+  , ?_assertEqual(ok, do_coveralls(ConvertWithOpts, Get, GetLocalAllOpt, MaybeSkip, eunit))
+  , ?_assertEqual(ok, do_coveralls(ConvertWithOpts, Get, GetLocalAllOpt, MaybeSkip, ct))
   ].
 
 -endif.
