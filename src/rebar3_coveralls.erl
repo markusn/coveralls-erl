@@ -97,11 +97,18 @@ cover_paths(State) ->
 %%=============================================================================
 %% Internal functions
 
+to_binary(List) when is_list(List) ->
+  unicode:characters_to_binary(List, utf8, utf8);
+to_binary(Atom) when is_atom(Atom) ->
+  atom_to_binary(Atom, utf8);
+to_binary(Bin) when is_binary(Bin) ->
+  Bin.
+
 do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   File         = GetLocal(coveralls_coverdata, undef),
-  ServiceName  = GetLocal(coveralls_service_name, undef),
-  ServiceJobId = GetLocal(coveralls_service_job_id, undef),
-  RepoToken    = GetLocal(coveralls_repo_token, []),
+  ServiceName  = to_binary(GetLocal(coveralls_service_name, undef)),
+  ServiceJobId = to_binary(GetLocal(coveralls_service_job_id, undef)),
+  RepoToken    = to_binary(GetLocal(coveralls_repo_token, [])),
   F            = fun(X) -> X =:= undef orelse X =:= false end,
   CoverExport  = Get(cover_export_enabled, false),
   case lists:any(F, [File, ServiceName, ServiceJobId, CoverExport]) of
@@ -137,7 +144,7 @@ task_test_() ->
   File           = "foo",
   ServiceJobId   = "123",
   ServiceName    = "bar",
-  ConvertAndSend = fun("foo", "123", "bar", "") -> ok end,
+  ConvertAndSend = fun("foo", <<"123">>, <<"bar">>, <<"">>) -> ok end,
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;
