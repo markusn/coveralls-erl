@@ -62,7 +62,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
   rebar_api:info("Running coveralls...", []),
-  ConvertAndSend = fun coveralls:convert_and_send_file/4,
+  ConvertAndSend = fun coveralls:convert_and_send_file/2,
   Get            = fun(Key, Def) -> rebar_state:get(State, Key, Def) end,
   GetLocal       = fun(Key, Def) -> rebar_state:get(State, Key, Def) end,
   MaybeSkip      = fun() -> ok end,
@@ -103,12 +103,14 @@ to_binary(Atom) when is_atom(Atom) ->
   atom_to_binary(Atom, utf8);
 to_binary(Bin) when is_binary(Bin) ->
   Bin.
+to_boolean(true) -> true;
+to_boolean(1)    -> true;
+to_boolean(_)    -> false.
 
 do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   File         = GetLocal(coveralls_coverdata, undef),
   ServiceName  = to_binary(GetLocal(coveralls_service_name, undef)),
   ServiceJobId = to_binary(GetLocal(coveralls_service_job_id, undef)),
-  RepoToken    = to_binary(GetLocal(coveralls_repo_token, [])),
   F            = fun(X) -> X =:= undef orelse X =:= false end,
   CoverExport  = Get(cover_export_enabled, false),
   case lists:any(F, [File, ServiceName, ServiceJobId, CoverExport]) of
@@ -117,20 +119,34 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
              "need to specify coveralls_* and cover_export_enabled "
              "in rebar.config"});
     false ->
-      DoCoveralls = (GetLocal(do_coveralls_after_ct, true)
-                     andalso Task == ct) orelse
-                    (GetLocal(do_coveralls_after_eunit, true)
-                     andalso Task == eunit) orelse
-                    Task == 'send-coveralls',
-      case DoCoveralls of
-        true ->
-          io:format("rebar_coveralls:"
-                    "Exporting cover data "
-                    "from ~s using service ~s and jobid ~s~n",
-                    [File, ServiceName, ServiceJobId]),
-          ok = ConvertAndSend(File, ServiceJobId, ServiceName, RepoToken);
-        _ -> MaybeSkip()
-      end
+      ok
+  end,
+
+  Report0 =
+    #{service_job_id => ServiceJobId,
+      service_name   => ServiceName},
+  Opts = [{coveralls_repo_token, string}],
+  Report =
+    lists:foldl(fun({Key, Conv}, R) ->
+                    case GetLocal(Key, undef) of
+                      undef -> R;
+                      Value when Conv =:= string  -> maps:put(Key, to_binary(Value), R);
+                      Value when Conv =:= boolean -> maps:put(Key, to_boolean(Value), R);
+                      Value -> maps:put(Key, Value, R)
+                    end
+                end, Report0, Opts),
+
+  DoCoveralls = (GetLocal(do_coveralls_after_ct, true) andalso Task == ct)
+    orelse (GetLocal(do_coveralls_after_eunit, true) andalso Task == eunit)
+    orelse Task == 'send-coveralls',
+  case DoCoveralls of
+    true ->
+      io:format("rebar_coveralls:"
+                "Exporting cover data "
+                "from ~s using service ~s and jobid ~s~n",
+                [File, ServiceName, ServiceJobId]),
+      ok = ConvertAndSend(File, Report);
+    _ -> MaybeSkip()
   end.
 
 
@@ -144,7 +160,8 @@ task_test_() ->
   File           = "foo",
   ServiceJobId   = "123",
   ServiceName    = "bar",
-  ConvertAndSend = fun("foo", <<"123">>, <<"bar">>, <<"">>) -> ok end,
+  ConvertAndSend = fun("foo", #{service_job_id := <<"123">>,
+                                service_name := <<"bar">>}) -> ok end,
   Get            = fun(cover_export_enabled, _) -> true end,
   GetLocal       = fun(coveralls_coverdata, _)      -> File;
                       (coveralls_service_name, _)   -> ServiceName;

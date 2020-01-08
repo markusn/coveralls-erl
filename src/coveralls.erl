@@ -36,8 +36,8 @@
 %%=============================================================================
 %% Exports
 
--export([ convert_file/4
-        , convert_and_send_file/4
+-export([ convert_file/2
+        , convert_and_send_file/2
         ]).
 
 %%=============================================================================
@@ -74,46 +74,35 @@
 %%      Note that this function will crash if the modules mentioned in
 %%      any of the `Filenames' are not availabe on the node.
 %% @end
--spec convert_file(string() | [string()], string(), string(), string()) ->
+-spec convert_file(string() | [string()], map()) ->
                           string().
-convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+convert_file(Filenames, Report) ->
+  convert_file(Filenames, Report, #s{}).
 
 %% @doc Import and convert cover files `Filenames' to a json string and send the
 %%      json to coveralls.
 %% @end
--spec convert_and_send_file(string() | [string()], string(), string(),
-                            string()) -> ok.
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+-spec convert_and_send_file(string() | [string()], map()) -> ok.
+convert_and_send_file(Filenames, Report) ->
+  convert_and_send_file(Filenames, Report, #s{}).
 
 %%=============================================================================
 %% Internal functions
 
-convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
+convert_file([L|_]=Filename, Report, S) when is_integer(L) ->
   %% single file or wildcard was specified
   WildcardReader = S#s.wildcard_reader,
   Filenames = WildcardReader(Filename),
-  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S);
-convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
+  convert_file(Filenames, Report, S);
+convert_file([[_|_]|_]=Filenames, Report, S) ->
   ok               = lists:foreach(
                        fun(Filename) -> ok = import(S, Filename) end,
                        Filenames),
   ConvertedModules = convert_modules(S),
+  jsx:encode(Report#{source_files => ConvertedModules}, []).
 
-  Report0 =
-    #{service_job_id => ServiceJobId,
-      service_name   => ServiceName,
-      source_files   => ConvertedModules},
-  Report =
-    case RepoToken of
-      <<"">> -> Report0;
-      _      -> Report0#{repo_token => RepoToken}
-    end,
-  jsx:encode(Report, []).
-
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
-  send(convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S), S).
+convert_and_send_file(Filenames, Report, S) ->
+  send(convert_file(Filenames, Report, S), S).
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
@@ -185,25 +174,26 @@ hex(<<I:4, R/bitstring>>) ->
 %% Converting modules
 
 convert_modules(S) ->
-  F = fun(Mod) -> convert_module(Mod, S) end,
-  lists:map(F, imported_modules(S)).
+  F = fun(Mod, L) -> convert_module(Mod, S, L) end,
+  lists:foldr(F, [], imported_modules(S)).
 
-convert_module(Mod, S) ->
+convert_module(Mod, S, L) ->
   {ok, CoveredLines0} = analyze(S, Mod),
   %% Remove strange 0 indexed line
   FilterF      = fun({{_, X}, _}) -> X =/= 0 end,
   CoveredLines = lists:filter(FilterF, CoveredLines0),
   case proplists:get_value(source, compile_info(S, Mod), "") of
-    "" -> "";
+    "" -> L;
     SrcFile ->
           {ok, SrcBin} = read_file(S, SrcFile),
           Src0         = lists:flatten(io_lib:format("~s", [SrcBin])),
           SrcDigest    = erlang:md5(SrcBin),
           LinesCount   = count_lines(Src0),
           Cov          = create_cov(CoveredLines, LinesCount),
-      #{name          => unicode:characters_to_binary(relative_to_cwd(SrcFile), utf8, utf8),
-        source_digest => hex(SrcDigest),
-        coverage      => Cov}
+      [#{name          => unicode:characters_to_binary(relative_to_cwd(SrcFile), utf8, utf8),
+         source_digest => hex(SrcDigest),
+         coverage      => Cov}
+       | L]
   end.
 
 expand(Path) -> expand(filename:split(Path), []).
@@ -288,8 +278,10 @@ convert_file_test() ->
           "    }"
           "  ]"
           "}">>, [return_maps, {labels, existing_atom}]),
+  Report = #{service_job_id => <<"1234567890">>,
+             service_name   => <<"travis-ci">>},
   Got = jsx:decode(
-          convert_file("example.rb", <<"1234567890">>, <<"travis-ci">>, <<"">>, mock_s()),
+          convert_file("example.rb", Report, mock_s()),
           [return_maps, {labels, existing_atom}]),
   ?assertEqual(Expected, Got).
 
@@ -309,11 +301,9 @@ convert_and_send_file_test() ->
       "    }"
       "  ]"
       "}"),
-  ?assertEqual(ok, convert_and_send_file("example.rb",
-                                         <<"1234567890">>,
-                                         <<"travis-ci">>,
-                                         <<"">>,
-                                         mock_s(Expected))).
+  Report = #{service_job_id => <<"1234567890">>,
+             service_name   => <<"travis-ci">>},
+  ?assertEqual(ok, convert_and_send_file("example.rb", Report, mock_s(Expected))).
 
 send_test_() ->
   Expected =
@@ -444,10 +434,10 @@ create_cov_test() ->
 
 convert_module_test() ->
   Expected =
-    #{name          => <<"example.rb">>,
-      source_digest => <<"3feb892deff06e7accbe2457eec4cd8b">>,
-      coverage      => [null,1,null]},
-  ?assertEqual(Expected, convert_module('example.rb', mock_s())).
+    [#{name          => <<"example.rb">>,
+       source_digest => <<"3feb892deff06e7accbe2457eec4cd8b">>,
+       coverage      => [null,1,null]}],
+  ?assertEqual(Expected, convert_module('example.rb', mock_s(), [])).
 
 convert_modules_test() ->
   Expected =
