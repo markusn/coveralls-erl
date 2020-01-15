@@ -66,6 +66,11 @@ Example `rebar.config`:
 
 Note that you'll need to set `COVERALLS_REPO_TOKEN` in your CircleCI environment variables!
 
+## Optional settings
+
+The pluging also support the `coveralls_service_pull_request` and `coveralls_parallel` settings.
+See the Coveralls documentation for the meaning of those.
+
 ## Author
 Markus Ekholm (markus at botten dot org).
 

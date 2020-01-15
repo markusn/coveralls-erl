@@ -36,8 +36,8 @@
 %%=============================================================================
 %% Exports
 
--export([ convert_file/4
-        , convert_and_send_file/4
+-export([ convert_file/2
+        , convert_and_send_file/2
         ]).
 
 %%=============================================================================
@@ -74,53 +74,39 @@
 %%      Note that this function will crash if the modules mentioned in
 %%      any of the `Filenames' are not availabe on the node.
 %% @end
--spec convert_file(string() | [string()], string(), string(), string()) ->
+-spec convert_file(string() | [string()], map()) ->
                           string().
-convert_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+convert_file(Filenames, Report) ->
+  convert_file(Filenames, Report, #s{}).
 
 %% @doc Import and convert cover files `Filenames' to a json string and send the
 %%      json to coveralls.
 %% @end
--spec convert_and_send_file(string() | [string()], string(), string(),
-                            string()) -> ok.
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken) ->
-  convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, #s{}).
+-spec convert_and_send_file(string() | [string()], map()) -> ok.
+convert_and_send_file(Filenames, Report) ->
+  convert_and_send_file(Filenames, Report, #s{}).
 
 %%=============================================================================
 %% Internal functions
 
-convert_file([L|_]=Filename, ServiceJobId, ServiceName, RepoToken, S) when is_integer(L) ->
+convert_file([L|_]=Filename, Report, S) when is_integer(L) ->
   %% single file or wildcard was specified
   WildcardReader = S#s.wildcard_reader,
   Filenames = WildcardReader(Filename),
-  convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S);
-convert_file([[_|_]|_]=Filenames, ServiceJobId, ServiceName, RepoToken0, S) ->
+  convert_file(Filenames, Report, S);
+convert_file([[_|_]|_]=Filenames, Report, S) ->
   ok               = lists:foreach(
                        fun(Filename) -> ok = import(S, Filename) end,
                        Filenames),
   ConvertedModules = convert_modules(S),
+  jsx:encode(Report#{source_files => ConvertedModules}, []).
 
-  RepoToken = case RepoToken0 of
-                  "" -> "";
-                  _ -> "\"repo_token\": \"" ++ RepoToken0 ++ "\",~n"
-              end,
-
-  Str              =
-    "{~n" ++ RepoToken ++
-    "\"service_job_id\": \"~s\",~n"
-    "\"service_name\": \"~s\",~n"
-    "\"source_files\": ~s"
-    "}",
-  lists:flatten(
-    io_lib:format(Str, [ServiceJobId, ServiceName, ConvertedModules])).
-
-convert_and_send_file(Filenames, ServiceJobId, ServiceName, RepoToken, S) ->
-  send(convert_file(Filenames, ServiceJobId, ServiceName, RepoToken, S), S).
+convert_and_send_file(Filenames, Report, S) ->
+  send(convert_file(Filenames, Report, S), S).
 
 send(Json, #s{poster=Poster, poster_init=Init}) ->
   ok       = Init(),
-  Boundary = "----------" ++ integer_to_list(?random:uniform(1000)),
+  Boundary = ["----------", integer_to_list(?random:uniform(1000))],
   Type     = "multipart/form-data; boundary=" ++ Boundary,
   Body     = to_body(Json, Boundary),
   R        = Poster(post, {?COVERALLS_URL, [], Type, Body}, [], []),
@@ -134,11 +120,11 @@ send(Json, #s{poster=Poster, poster_init=Init}) ->
 %% HTTP helpers
 
 to_body(Json, Boundary) ->
-  "--" ++ Boundary ++ "\r\n" ++
-    "Content-Disposition: form-data; name=\"json_file\"; "
-    "filename=\"json_file.json\" \r\n"
-    "Content-Type: application/json\r\n\r\n"
-    ++ Json ++ "\r\n" ++ "--" ++ Boundary ++ "--" ++ "\r\n".
+  iolist_to_binary(["--", Boundary, "\r\n",
+                    "Content-Disposition: form-data; name=\"json_file\"; "
+                    "filename=\"json_file.json\" \r\n"
+                    "Content-Type: application/json\r\n\r\n",
+                    Json, "\r\n", "--", Boundary, "--", "\r\n"]).
 
 %%-----------------------------------------------------------------------------
 %% Callback mockery
@@ -176,34 +162,38 @@ wrap_start(StartFun) ->
     ok                          -> ok
   end.
 
+digit(I) when I < 10 -> <<($0 + I):8>>;
+digit(I) -> <<($a -10 + I):8>>.
+
+hex(<<>>) ->
+  <<>>;
+hex(<<I:4, R/bitstring>>) ->
+  <<(digit(I))/binary, (hex(R))/binary>>.
+
 %%-----------------------------------------------------------------------------
 %% Converting modules
 
 convert_modules(S) ->
-  F = fun(Mod) -> convert_module(Mod, S) end,
-  "[\n" ++ join(lists:map(F, imported_modules(S)), ",\n") ++ "\n]\n".
+  F = fun(Mod, L) -> convert_module(Mod, S, L) end,
+  lists:foldr(F, [], imported_modules(S)).
 
-convert_module(Mod, S) ->
+convert_module(Mod, S, L) ->
   {ok, CoveredLines0} = analyze(S, Mod),
   %% Remove strange 0 indexed line
   FilterF      = fun({{_, X}, _}) -> X =/= 0 end,
   CoveredLines = lists:filter(FilterF, CoveredLines0),
   case proplists:get_value(source, compile_info(S, Mod), "") of
-    "" -> "";
+    "" -> L;
     SrcFile ->
           {ok, SrcBin} = read_file(S, SrcFile),
           Src0         = lists:flatten(io_lib:format("~s", [SrcBin])),
-          SrcDigest    = binary:decode_unsigned(erlang:md5(SrcBin)),
+          SrcDigest    = erlang:md5(SrcBin),
           LinesCount   = count_lines(Src0),
           Cov          = create_cov(CoveredLines, LinesCount),
-          Str          =
-            "{~n"
-            "\"name\": \"~s\",~n"
-            "\"source_digest\": \"~.16b\",~n"
-            "\"coverage\": ~p~n"
-            "}",
-          lists:flatten(
-            io_lib:format(Str, [relative_to_cwd(SrcFile), SrcDigest, Cov]))
+      [#{name          => unicode:characters_to_binary(relative_to_cwd(SrcFile), utf8, utf8),
+         source_digest => hex(SrcDigest),
+         coverage      => Cov}
+       | L]
   end.
 
 expand(Path) -> expand(filename:split(Path), []).
@@ -260,78 +250,75 @@ count_lines("\n")    -> 1;
 count_lines([$\n|S]) -> 1 + count_lines(S);
 count_lines([_|S])   -> count_lines(S).
 
-join(List, Sep) -> join1([E || E <- List, E /= ""], Sep).
-
-join1([H], _Sep)  -> H;
-join1([H|T], Sep) -> H ++ Sep ++ join1(T, Sep).
-
 %%=============================================================================
 %% Tests
 
 -ifdef(TEST).
+-define(DEBUG, true).
 -include_lib("eunit/include/eunit.hrl").
+
+normalize_json_str(Str) when is_binary(Str) ->
+  jsx:encode(jsx:decode(Str, [return_maps, {labels, existing_atom}]));
+normalize_json_str(Str) when is_list(Str) ->
+  normalize_json_str(iolist_to_binary(Str)).
 
 convert_file_test() ->
   Expected =
-    "{\n"
-    "\"service_job_id\": \"1234567890\",\n"
-    "\"service_name\": \"travis-ci\",\n"
-    "\"source_files\": [\n"
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "},\n"
-    "{\n"
-    "\"name\": \"two.rb\",\n"
-    "\"source_digest\": \"fce46ee19702bd262b2e4907a005aff4\",\n"
-    "\"coverage\": [null,1,0,null]\n"
-    "}\n"
-    "]\n"
-    "}",
-  ?assertEqual(Expected, convert_file("example.rb",
-                                      "1234567890",
-                                      "travis-ci",
-                                      "",
-                                      mock_s())).
+      jsx:decode(
+        <<"{\"service_job_id\": \"1234567890\","
+          " \"service_name\": \"travis-ci\","
+          " \"source_files\": ["
+          "    {\"name\": \"example.rb\","
+          "     \"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\","
+          "     \"coverage\": [null,1,null]"
+          "    },"
+          "    {\"name\": \"two.rb\","
+          "     \"source_digest\": \"fce46ee19702bd262b2e4907a005aff4\","
+          "     \"coverage\": [null,1,0,null]"
+          "    }"
+          "  ]"
+          "}">>, [return_maps, {labels, existing_atom}]),
+  Report = #{service_job_id => <<"1234567890">>,
+             service_name   => <<"travis-ci">>},
+  Got = jsx:decode(
+          convert_file("example.rb", Report, mock_s()),
+          [return_maps, {labels, existing_atom}]),
+  ?assertEqual(Expected, Got).
 
 convert_and_send_file_test() ->
   Expected =
-    "{\n"
-    "\"service_job_id\": \"1234567890\",\n"
-    "\"service_name\": \"travis-ci\",\n"
-    "\"source_files\": [\n"
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "},\n"
-    "{\n"
-    "\"name\": \"two.rb\",\n"
-    "\"source_digest\": \"fce46ee19702bd262b2e4907a005aff4\",\n"
-    "\"coverage\": [null,1,0,null]\n"
-    "}\n"
-    "]\n"
-    "}",
-  ?assertEqual(ok, convert_and_send_file("example.rb",
-                                         "1234567890",
-                                         "travis-ci",
-                                         "",
-                                         mock_s(Expected))).
+    normalize_json_str(
+      "{\"service_job_id\": \"1234567890\","
+      " \"service_name\": \"travis-ci\","
+      " \"source_files\": ["
+      "    {\"name\": \"example.rb\","
+      "     \"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\","
+      "     \"coverage\": [null,1,null]"
+      "    },"
+      "    {\"name\": \"two.rb\","
+      "     \"source_digest\": \"fce46ee19702bd262b2e4907a005aff4\","
+      "     \"coverage\": [null,1,0,null]"
+      "    }"
+      "  ]"
+      "}"),
+  Report = #{service_job_id => <<"1234567890">>,
+             service_name   => <<"travis-ci">>},
+  ?assertEqual(ok, convert_and_send_file("example.rb", Report, mock_s(Expected))).
 
 send_test_() ->
   Expected =
-    "{\n"
-    "\"service_job_id\": \"1234567890\",\n"
-    "\"service_name\": \"travis-ci\",\n"
-    "\"source_files\": [\n"
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source_digest\": \"\tdef four\\n  4\\nend\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "}\n]\n}",
+    normalize_json_str(
+      "{\"service_job_id\": \"1234567890\",\n"
+      " \"service_name\": \"travis-ci\",\n"
+      " \"source_files\": [\n"
+      "    {\"name\": \"example.rb\",\n"
+      "     \"source_digest\": \"\tdef four\\n  4\\nend\",\n"
+      "     \"coverage\": [null,1,null]\n"
+      "    }"
+      "  ]"
+      "}"),
   [ ?_assertEqual(ok, send(Expected, mock_s(Expected)))
-  , ?_assertThrow({error, {_,_}}, send("foo", mock_s("bar")))
+  , ?_assertThrow({error, {_,_}}, send("foo", mock_s(<<"bar">>)))
   ].
 
 %%-----------------------------------------------------------------------------
@@ -344,13 +331,6 @@ count_lines_test_() ->
   , ?_assertEqual(2, count_lines("foo\nbar"))
   , ?_assertEqual(3, count_lines("foo\n\nbar"))
   , ?_assertEqual(2, count_lines("foo\nbar\n"))
-  ].
-
-join_test_() ->
-  [ ?_assertEqual("a,b"  , join(["a","b"], ","))
-  , ?_assertEqual("a,b,c", join(["a","b","c"], ","))
-  , ?_assertEqual("a,c"  , join(["a","","c"], ","))
-  , ?_assertEqual("a,b"  , join(["a","b",""], ","))
   ].
 
 expand_test_() ->
@@ -454,27 +434,21 @@ create_cov_test() ->
 
 convert_module_test() ->
   Expected =
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "}",
-  ?assertEqual(Expected, lists:flatten(convert_module('example.rb', mock_s()))).
+    [#{name          => <<"example.rb">>,
+       source_digest => <<"3feb892deff06e7accbe2457eec4cd8b">>,
+       coverage      => [null,1,null]}],
+  ?assertEqual(Expected, convert_module('example.rb', mock_s(), [])).
 
 convert_modules_test() ->
   Expected =
-    "[\n"
-    "{\n"
-    "\"name\": \"example.rb\",\n"
-    "\"source_digest\": \"3feb892deff06e7accbe2457eec4cd8b\",\n"
-    "\"coverage\": [null,1,null]\n"
-    "},\n"
-    "{\n"
-    "\"name\": \"two.rb\",\n"
-    "\"source_digest\": \"fce46ee19702bd262b2e4907a005aff4\",\n"
-    "\"coverage\": [null,1,0,null]\n"
-    "}\n"
-    "]\n",
+    [#{name          => <<"example.rb">>,
+       source_digest => <<"3feb892deff06e7accbe2457eec4cd8b">>,
+       coverage      => [null,1,null]
+      },
+     #{name          => <<"two.rb">>,
+       source_digest => <<"fce46ee19702bd262b2e4907a005aff4">>,
+       coverage      => [null,1,0,null]
+      }],
   ?assertEqual(Expected,
                convert_modules(mock_s())).
 
@@ -510,7 +484,7 @@ mock_s(Json) ->
         fun() -> ok end
     , poster        =
         fun(post, {_, _, _, Body}, _, _) ->
-            case string:str(Body, Json) =/= 0 of
+            case binary:match(Body, Json) =/= nomatch of
               true  -> {ok, {{"", 200, ""}, "", ""}};
               false -> {ok, {{"", 666, ""}, "", "Not expected"}}
             end

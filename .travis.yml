@@ -12,3 +12,5 @@ otp_release:
 script:
   - ./rebar3 do eunit,edoc
   - ./rebar3 as test coveralls send
+notifications:
+  webhooks: https://coveralls.io/webhook
