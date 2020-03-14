@@ -95,7 +95,14 @@ You will also need to add the following lines to your `rebar.config`:
 
 These changes will add `coveralls-erl` as a dependency, tell `rebar3` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `github`.
 
-And you send the coverdata to coveralls by issuing: `rebar3 as test coveralls send`
+And you send the coverdata to coveralls by adding a step like:
+
+```
+- name: Coveralls
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: rebar3 as test coveralls send
+```
 
 Other available GitHub Actions Environment Variables are available [here](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables)
 
