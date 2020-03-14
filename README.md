@@ -66,6 +66,41 @@ Example `rebar.config`:
 
 Note that you'll need to set `COVERALLS_REPO_TOKEN` in your CircleCI environment variables!
 
+## Example usage: rebar3 and GitHub Actions
+
+In order to use coveralls-erl + GitHub Actions in your project, you need to store the Coveralls Repo Token among young GitHub secrets. Go to Settings -> Secrets and add a new one named `COVERALLS_REPO_TOKEN` containing the repo token from your Coveralls account.
+
+Then, add the following lines to your
+`rebar.config.script`:
+
+```erlang
+case {os:getenv("GITHUB_ACTIONS"), os:getenv("COVERALLS_REPO_TOKEN")} of
+  {"true", Token} when is_list(Token) ->
+    JobId = os:getenv("GITHUB_RUN_ID"),
+    CONFIG1 = lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId}),
+    lists:keystore(coveralls_repo_token, 1, CONFIG1, {coveralls_repo_token, Token});
+  _ ->
+    CONFIG
+end.
+```
+
+This will ensure that the rebar coveralls plugin will have access to the needed JobId and that the plugin is only run from GitHub Actions.
+
+You will also need to add the following lines to your `rebar.config`:
+```erlang
+{plugins                , [coveralls]}. % use hex package
+{cover_enabled          , true}.
+{cover_export_enabled   , true}.
+{coveralls_coverdata    , "_build/test/cover/eunit.coverdata"}. % or a string with wildcards or a list of files
+{coveralls_service_name , "github"}.
+```
+
+These changes will add `coveralls-erl` as a dependency, tell `rebar3` where to find the plugin, make sure that the coverage data is produced and exported and configure `coveralls-erl` to use this data and the service `github`.
+
+And you send the coverdata to coveralls by issuing: `rebar3 as test coveralls send`
+
+Other available GitHub Actions Environment Variables are available [here](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables)
+
 ## Optional settings
 
 The pluging also support the `coveralls_service_pull_request` and `coveralls_parallel` settings.
