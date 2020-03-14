@@ -68,13 +68,11 @@ Note that you'll need to set `COVERALLS_REPO_TOKEN` in your CircleCI environment
 
 ## Example usage: rebar3 and GitHub Actions
 
-In order to use coveralls-erl + GitHub Actions in your project, you need to store the Coveralls Repo Token among young GitHub secrets. Go to Settings -> Secrets and add a new one named `COVERALLS_REPO_TOKEN` containing the repo token from your Coveralls account.
-
-Then, add the following lines to your
+In order to use coveralls-erl + GitHub Actions in your project, you will need to add the following lines to your
 `rebar.config.script`:
 
 ```erlang
-case {os:getenv("GITHUB_ACTIONS"), os:getenv("COVERALLS_REPO_TOKEN")} of
+case {os:getenv("GITHUB_ACTIONS"), os:getenv("GITHUB_TOKEN")} of
   {"true", Token} when is_list(Token) ->
     JobId = os:getenv("GITHUB_RUN_ID"),
     CONFIG1 = lists:keystore(coveralls_service_job_id, 1, CONFIG, {coveralls_service_job_id, JobId}),
