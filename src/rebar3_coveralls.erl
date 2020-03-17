@@ -127,6 +127,8 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
       service_name   => ServiceName},
   Opts = [{coveralls_repo_token,           repo_token,           string},
           {coveralls_service_pull_request, service_pull_request, string},
+          {coveralls_commit_sha,           commit_sha,           string},
+          {coveralls_service_number,       service_number,       string},
           {coveralls_parallel,             parallel,             boolean}],
   Report =
     lists:foldl(fun({Cfg, Key, Conv}, R) ->
