@@ -76,8 +76,8 @@ case {os:getenv("GITHUB_ACTIONS"), os:getenv("GITHUB_TOKEN")} of
   {"true", Token} when is_list(Token) ->
     CONFIG1 = [{coveralls_repo_token, Token},
                {coveralls_service_job_id, os:getenv("GITHUB_RUN_ID")},
-               {coveralls_commit_sha, os:getenv("GITHUB_SHA")},
-               {coveralls_service_number, os:getenv("GITHUB_RUN_NUMBER")} | CONFIG],
+               {coveralls_commit_sha, os:getenv("GITHUB_SHA")}
+              | CONFIG],
     case os:getenv("GITHUB_EVENT_NAME") =:= "pull_request"
         andalso string:tokens(os:getenv("GITHUB_REF"), "/") of
         [_, "pull", PRNO, _] ->
@@ -110,6 +110,60 @@ And you send the coverdata to coveralls by adding a step like:
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   run: rebar3 as test coveralls send
+```
+
+Using the parallels options on GitHub Actions requires a bit of magic that is not explained anywhere in detail.
+
+First amend your `rebar.config` with the following line:
+```erlang
+{coveralls_parallel, true}.
+```
+
+Adjust your GH workflow to export the matrix step as `COVERALLS_FLAG_NAME`:
+
+```
+    - name: Coveralls
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERALLS_FLAG_NAME: ${{ matrix.otp }}
+      run: rebar3 as test coveralls send || /bin/true
+```
+
+And use that in your `rebar.config.script`:
+
+```erlang
+case {os:getenv("GITHUB_ACTIONS"), os:getenv("GITHUB_TOKEN")} of
+  {"true", Token} when is_list(Token) ->
+    CONFIG1 = [{coveralls_repo_token, Token},
+               {coveralls_service_job_id, os:getenv("GITHUB_RUN_ID")},
+               {coveralls_commit_sha, os:getenv("GITHUB_SHA")},
+               {coveralls_flag_name, os:getenv("COVERALLS_FLAG_NAME")}
+              | CONFIG],
+    case os:getenv("GITHUB_EVENT_NAME") =:= "pull_request"
+        andalso string:tokens(os:getenv("GITHUB_REF"), "/") of
+        [_, "pull", PRNO, _] ->
+            [{coveralls_service_pull_request, PRNO} | CONFIG1];
+        _ ->
+            CONFIG1
+    end;
+  _ ->
+    CONFIG
+end.
+```
+
+Then extend your GitHub actions with an end trigger (assuming you matrix test job is called `test`):
+```yaml
+  finish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+           curl -v -k https://coveralls.io/webhook \
+                --header "Content-Type: application/json" \
+                --data "{\"repo_name\":\"$GITHUB_REPOSITORY\",\"repo_token\":\"$GITHUB_TOKEN\",\"payload\":{\"build_num\":$GITHUB_RUN_ID,\"status\":\"done\"}}"
 ```
 
 Other available GitHub Actions Environment Variables are available [here](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables)
