@@ -112,6 +112,28 @@ And you send the coverdata to coveralls by adding a step like:
   run: rebar3 as test coveralls send
 ```
 
+Using the parallels options on GitHub Actions requires a bit of magic that is not explained anywhere in detail.
+
+First amend your `rebar.config` with the following line:
+```erlang
+{coveralls_parallel, true}.
+```
+
+Then extend your GitHub actions with an end trigger (assuming you matrix test job is called `test`):
+```yaml
+  finish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+           curl -v -k https://coveralls.io/webhook \
+                --header "Content-Type: application/json" \
+                --data "{\"repo_name\":\"$GITHUB_REPOSITORY\",\"repo_token\":\"$GITHUB_TOKEN\",\"payload\":{\"build_num\":$GITHUB_RUN_NUMBER,\"status\":\"done\"}}"
+```
+
 Other available GitHub Actions Environment Variables are available [here](https://help.github.com/en/actions/configuring-and-managing-workflows/using-environment-variables)
 
 ## Optional settings
