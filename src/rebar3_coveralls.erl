@@ -125,10 +125,12 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
   Report0 =
     #{service_job_id => ServiceJobId,
       service_name   => ServiceName},
+  Report1 = collect_git_info(Report0),
   Opts = [{coveralls_repo_token,           repo_token,           string},
           {coveralls_service_pull_request, service_pull_request, string},
           {coveralls_commit_sha,           commit_sha,           string},
           {coveralls_service_number,       service_number,       string},
+          {coveralls_flag_name,            flag_name,            string},
           {coveralls_parallel,             parallel,             boolean}],
   Report =
     lists:foldl(fun({Cfg, Key, Conv}, R) ->
@@ -138,7 +140,8 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
                       Value when Conv =:= boolean -> maps:put(Key, to_boolean(Value), R);
                       Value -> maps:put(Key, Value, R)
                     end
-                end, Report0, Opts),
+                end, Report1, Opts),
+  rebar_log:log(debug, "Coveralls Report: ~p", [Report]),
 
   DoCoveralls = (GetLocal(do_coveralls_after_ct, true) andalso Task == ct)
     orelse (GetLocal(do_coveralls_after_eunit, true) andalso Task == eunit)
@@ -153,6 +156,44 @@ do_coveralls(ConvertAndSend, Get, GetLocal, MaybeSkip, Task) ->
     _ -> MaybeSkip()
   end.
 
+git_trim(Str) ->
+  re:replace(Str, "\\s+", "", [global, {return, binary}]).
+
+collect_git_info(Report) ->
+  case rebar_utils:sh("git rev-parse --verify HEAD", [return_on_error]) of
+    {ok, Id} ->
+      Report#{git => collect_git_details(git_trim(Id))};
+    _ ->
+      %% git not available
+      Report
+  end.
+
+collect_git_details(Id) ->
+  {ok, Details} = rebar_utils:sh("git show -s --pretty=format:'%aN%n%aE%n%cN%n%cE%n%s'", []),
+  Info = re:split(Details, "\n", [{return, binary}]),
+  Head = maps:from_list(
+           lists:zip(
+             ['author_name', 'author_email', 'committer_name', 'committer_email', 'message'], Info)),
+  collect_git_branch_details(#{head => Head#{id => Id}}).
+
+collect_git_branch_details(Git) ->
+  {ok, Branch} = rebar_utils:sh("git rev-parse --abbrev-ref HEAD", []),
+  collect_git_remotes(Git#{branch => git_trim(Branch)}).
+
+collect_git_remotes(Git) ->
+  {ok, Details} = rebar_utils:sh("git remote -v", []),
+  Remotes =
+    lists:foldl(
+      fun(X, R) ->
+          case re:run(X, "\\s\\(push\\)$", [notempty]) of
+            {match, _} ->
+              [Name, URL | _] = re:split(X, "\\s+", [{return, binary}]),
+              [#{name => Name, url => URL} | R];
+            _ ->
+              R
+          end
+      end, [], rebar_string:lexemes(Details, "\n")),
+  Git#{remotes => lists:usort(Remotes)}.
 
 %%=============================================================================
 %% Tests
