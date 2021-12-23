@@ -116,7 +116,7 @@ Other available GitHub Actions Environment Variables are available [here](https:
 
 ## Optional settings
 
-The pluging also support the `coveralls_service_pull_request` and `coveralls_parallel` settings.
+The plugin also support the `coveralls_service_pull_request` and `coveralls_parallel` settings.
 See the Coveralls documentation for the meaning of those.
 
 ## Author
