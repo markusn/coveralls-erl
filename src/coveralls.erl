@@ -72,7 +72,7 @@
 %%      representation suitable to post to coveralls.
 %%
 %%      Note that this function will crash if the modules mentioned in
-%%      any of the `Filenames' are not availabe on the node.
+%%      any of the `Filenames' are not available on the node.
 %% @end
 -spec convert_file(string() | [string()], map()) ->
                           string().
